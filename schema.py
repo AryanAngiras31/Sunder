@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from enum import Enum
 
 # Knowledge Layer schema
@@ -25,6 +25,9 @@ class CodeNode(BaseModel):
     parent_nodes: List[str] = Field(
         default_factory=list, 
         description="UUIDs of functions throughout the repository that call this node. Use these to understand realistic input structures."
+    )
+    language: str = Field(
+        description="The programming language of this code chunk (e.g., 'python', 'javascript', 'go')."
     )
 
 # Execution Layer schema
@@ -67,13 +70,25 @@ class SandboxProfile(BaseModel):
 class ExecutionReport(BaseModel):
     """Raw data returned from the Docker Sandbox."""
     exit_code: int = Field(
-        description="The integer exit code returned by the test execution. 0 indicates a clean exit, >0 indicates a crash or assertion failure."
+        description="The integer exit code returned by the test execution."
     )
     stdout: str = Field(
         description="The standard terminal output generated during the test run."
     )
     stderr: str = Field(
         description="The error traces, panic logs, or warnings generated during the test run."
+    )
+    duration_seconds: float = Field(
+        default=0.0,
+        description="The total time taken for the sandbox execution."
+    )
+    oom_killed: bool = Field(
+        default=False,
+        description="True if the Docker container was killed for exceeding memory limits."
+    )
+    timed_out: bool = Field(
+        default=False,
+        description="True if the execution hit the timeout_seconds limit and was killed by the host."
     )
 
 # Orchestration Layer schema
@@ -96,7 +111,7 @@ class BlastRadiusContext(BaseModel):
 
 class EnvironmentState(BaseModel):
     """Persistent data object generated during Baseline Mode."""
-    auth_headers: Dict[str, str] = Field(
+    auth_headers: Dict[str, SecretStr] = Field(
         default_factory=dict,
         description="Generated JWTs, session IDs, or Bearer tokens required to bypass authentication checks."
     )
@@ -104,11 +119,11 @@ class EnvironmentState(BaseModel):
         default_factory=dict,
         description="Key-value map of mock database IDs initialized during the Baseline test (e.g., {'test_user_id': 'uuid-123'})."
     )
-    cookies: Dict[str, str] = Field(
+    cookies: Dict[str, SecretStr] = Field(
         default_factory=dict, 
         description="Session cookies required for web-based auth barriers."
     )
-    mock_credentials: Dict[str, str] = Field(
+    mock_credentials: Dict[str, SecretStr] = Field(
         default_factory=dict, 
         description="Plaintext username/passwords created by the Baseline test for the AI to use in payloads."
     )
@@ -125,6 +140,12 @@ class AgentStatus(str, Enum):
     PENDING = "pending"
     COMPLETED = "completed"
     FAILED = "failed"
+
+class EvaluationVerdict(str, Enum):
+    """The internal conclusion reached by the LangGraph Evaluator node."""
+    SYSTEM_SECURE = "SYSTEM_SECURE"
+    VULNERABILITY_FOUND = "VULNERABILITY_FOUND"
+    SYNTAX_ERROR = "SYNTAX_ERROR"
 
 class SunderAgentState(BaseModel):
     """The mutable state object passed between nodes in the LangGraph state machine."""
@@ -161,9 +182,11 @@ class SunderAgentState(BaseModel):
         default=AgentStatus.PENDING,
         description="The overarching status of the LangGraph state machine execution."
     )
-
-class EvaluationVerdict(str, Enum):
-    """The internal conclusion reached by the LangGraph Evaluator node."""
-    SYSTEM_SECURE = "SYSTEM_SECURE"
-    VULNERABILITY_FOUND = "VULNERABILITY_FOUND"
-    SYNTAX_ERROR = "SYNTAX_ERROR"
+    final_verdict: Optional[EvaluationVerdict] = Field(
+        default=None,
+        description="The final conclusion reached by the Evaluator node upon completion."
+    )
+    internal_system_error: Optional[str] = Field(
+        default=None,
+        description="Captures host-level errors (e.g., Docker daemon unreachable, AST parsing failure) to safely abort the graph."
+    )
