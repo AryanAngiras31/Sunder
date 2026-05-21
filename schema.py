@@ -36,10 +36,6 @@ class NetworkMode(str, Enum):
     NONE = "none"
     BRIDGE = "bridge"
 
-class BuildSource(str, Enum):
-    SUNDER_DOCKERFILE = "sunder_dockerfile"
-    SUNDER_COMPOSE = "sunder_compose"
-
 class SandboxProfile(BaseModel):
     """Configuration object managed by the TUI and enforced by the Execution Layer."""
     network_mode: NetworkMode = Field(
@@ -61,10 +57,6 @@ class SandboxProfile(BaseModel):
     environment_vars: Dict[str, str] = Field(
         default_factory=dict,
         description="Key-value pairs of environment variables injected into the container (e.g., configuration overrides or poison pill credentials)."
-    )
-    build_source: BuildSource = Field(
-        default=BuildSource.SUNDER_DOCKERFILE,
-        description="Specifies whether to build from a custom Dockerfile or a docker-compose configuration."
     )
 
 class ExecutionReport(BaseModel):
