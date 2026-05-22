@@ -2,7 +2,6 @@ import os
 import hashlib
 import docker
 from docker.errors import ImageNotFound, BuildError
-from schema import SandboxProfile
 
 class Bootstrapper:
     def __init__(self):

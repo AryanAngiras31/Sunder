@@ -1,0 +1,44 @@
+# ========================
+# Python Environments
+# ========================
+.venv/
+venv/
+env/
+
+# ========================
+# Byte-compiled / Cache
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# ========================
+# Packaging & Builds
+# ========================
+build/
+dist/
+*.egg-info/
+*.egg
+UNKNOWN.egg-info/
+
+# ========================
+# Environment Variables
+# ========================
+.env
+.env.local
+
+# ========================
+# Testing & Coverage
+# ========================
+.coverage
+htmlcov/
+.tox/
+
+# ========================
+# IDEs & OS Files
+# ========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

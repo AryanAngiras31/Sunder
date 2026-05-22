@@ -2,9 +2,8 @@ import os
 import time
 import tempfile
 import docker
-from docker.errors import ContainerError, APIError
-from schema import SandboxProfile, ExecutionReport
-
+from docker.errors import APIError
+from sunder.schema import SandboxProfile, ExecutionReport
 
 # A map to resolve Tree-sitter language IDs to file extensions
 LANGUAGE_EXTENSION_MAP = {
