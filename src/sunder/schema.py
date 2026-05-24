@@ -182,3 +182,143 @@ class SunderAgentState(BaseModel):
         default=None,
         description="Captures host-level errors (e.g., Docker daemon unreachable, AST parsing failure) to safely abort the graph."
     )
+
+# --- Constants ---
+
+# Map file extensions to Tree-sitter language identifiers
+EXTENSION_TO_LANGUAGE = {
+    # Core languages
+    ".py": "python",
+    ".js": "javascript",
+    ".ts": "typescript",
+    ".go": "go",
+    ".java": "java",
+    ".rs": "rust",
+    ".c": "c",
+    ".cpp": "cpp",
+    ".cs": "c_sharp",  # Matches both "csharp" and "c#" from the map
+    ".rb": "ruby",
+
+    # Enterprise & Mobile
+    ".kt": "kotlin",
+    ".swift": "swift",
+    ".m": "objective_c",
+    
+    # Web & Scripting
+    ".php": "php",
+    ".dart": "dart",
+    ".t": "perl",
+    ".lua": "lua",
+    ".R": "r",
+
+    # Functional & Concurrency
+    ".exs": "elixir",
+    ".erl": "erlang",
+    ".hs": "haskell",
+    ".scala": "scala",
+
+    # Infrastructure & Systems
+    ".bats": "shell"  # Covers both "shell" and "bash"
+}
+
+# Skip folders that are commonly ignored during code analysis
+SKIP_FOLDERS = (
+    # Python (.py)
+    "__pycache__",
+    "venv",
+    "env",
+    "htmlcov",
+    "site-packages",
+    
+    # JavaScript / TypeScript (.js, .ts)
+    "node_modules",
+    "bower_components",
+    "dist",
+    "out",
+    "build",
+    
+    # Go (.go)
+    "vendor",
+    
+    # Java / Kotlin / Scala (.java, .kt, .scala)
+    "target",
+    "bin",
+    "build",
+    "out",
+    
+    # Rust (.rs)
+    "target",
+    
+    # C / C++ (.c, .cpp)
+    "build",
+    "cmake-build-debug",
+    "cmake-build-release",
+    "obj",
+    
+    # C# (.cs)
+    "bin",
+    "obj",
+    
+    # Ruby (.rb)
+    "vendor",
+    "bundle",
+    
+    # Swift / Objective-C (.swift, .m)
+    "Carthage",
+    "Pods",
+    "DerivedData",
+    
+    # PHP (.php)
+    "vendor",
+    
+    # Dart (.dart)
+    "build",
+    "tool",
+    
+    # Perl / Lua / R (.t, .lua, .R)
+    "blib",
+    "lua_modules",
+    
+    # Elixir / Erlang / Haskell (.exs, .erl, .hs)
+    "_build",
+    "deps",
+    "dist-newstyle"
+)
+
+# A map to resolve Tree-sitter language IDs to file extensions
+LANGUAGE_EXTENSION_MAP = {
+    # Core languages
+    "python": ".py",              # Pytest / Unittest
+    "javascript": ".test.js",     # Jest / Mocha
+    "typescript": ".test.ts",     # Jest
+    "go": "_test.go",             # `go test` convention
+    "java": "Test.java",          # JUnit convention (must match class name)
+    "ruby": "_spec.rb",           # RSpec convention (or _test.rb for Minitest)
+    "rust": ".rs",                # Cargo test (usually integrated or tests/ folder)
+    "c": ".c",                    # Unity / CMocka
+    "cpp": ".cpp",                # Google Test / Catch2
+
+    # Enterprise & Mobile
+    "csharp": "Tests.cs",         # xUnit / NUnit
+    "c#": "Tests.cs",             # Alias for Tree-sitter variations
+    "kotlin": "Test.kt",          # JUnit / Kotest
+    "swift": "Tests.swift",       # XCTest
+    "objective-c": "Tests.m",     # XCTest
+    
+    # Web & Scripting
+    "php": "Test.php",            # PHPUnit
+    "dart": "_test.dart",         # Dart test / Flutter test
+    "perl": ".t",                 # Test::More (standard Perl testing)
+    "lua": "_spec.lua",           # Busted (Lua testing framework)
+    "r": "test.R",                # testthat
+
+    # Functional & Concurrency
+    "elixir": "_test.exs",        # ExUnit
+    "erlang": "_SUITE.erl",       # Common Test
+    "haskell": "Spec.hs",         # Hspec
+    "scala": "Spec.scala",        # ScalaTest
+
+    # Infrastructure & Systems
+    "shell": ".bats",             # Bash Automated Testing System
+    "bash": ".bats",              # Alias
+}

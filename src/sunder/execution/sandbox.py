@@ -3,45 +3,7 @@ import time
 import tempfile
 import docker
 from docker.errors import APIError
-from sunder.schema import SandboxProfile, ExecutionReport
-
-# A map to resolve Tree-sitter language IDs to file extensions
-LANGUAGE_EXTENSION_MAP = {
-    # Core languages
-    "python": ".py",              # Pytest / Unittest
-    "javascript": ".test.js",     # Jest / Mocha
-    "typescript": ".test.ts",     # Jest
-    "go": "_test.go",             # `go test` convention
-    "java": "Test.java",          # JUnit convention (must match class name)
-    "ruby": "_spec.rb",           # RSpec convention (or _test.rb for Minitest)
-    "rust": ".rs",                # Cargo test (usually integrated or tests/ folder)
-    "c": ".c",                    # Unity / CMocka
-    "cpp": ".cpp",                # Google Test / Catch2
-
-    # Enterprise & Mobile
-    "csharp": "Tests.cs",         # xUnit / NUnit
-    "c#": "Tests.cs",             # Alias for Tree-sitter variations
-    "kotlin": "Test.kt",          # JUnit / Kotest
-    "swift": "Tests.swift",       # XCTest
-    "objective-c": "Tests.m",     # XCTest
-    
-    # Web & Scripting
-    "php": "Test.php",            # PHPUnit
-    "dart": "_test.dart",         # Dart test / Flutter test
-    "perl": ".t",                 # Test::More (standard Perl testing)
-    "lua": "_spec.lua",           # Busted (Lua testing framework)
-    "r": "test.R",                # testthat
-
-    # Functional & Concurrency
-    "elixir": "_test.exs",        # ExUnit
-    "erlang": "_SUITE.erl",       # Common Test
-    "haskell": "Spec.hs",         # Hspec
-    "scala": "Spec.scala",        # ScalaTest
-
-    # Infrastructure & Systems
-    "shell": ".bats",             # Bash Automated Testing System
-    "bash": ".bats",              # Alias
-}
+from sunder.schema import SandboxProfile, ExecutionReport, LANGUAGE_EXTENSION_MAP
 
 class SandboxExecutor:
     def __init__(self):
