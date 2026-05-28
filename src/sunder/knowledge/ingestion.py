@@ -5,6 +5,7 @@ from llama_index.core.schema import NodeRelationship
 from llama_index.core.node_parser import CodeHierarchyNodeParser
 from sunder.schema import CodeNode, EXTENSION_TO_LANGUAGE, SKIP_FOLDERS
 from sunder.knowledge.database import KnowledgeDatabase
+import logging
 
 class IngestionEngine:
     def __init__(self, db: KnowledgeDatabase):
@@ -27,21 +28,27 @@ class IngestionEngine:
     def ingest_repository(self, target_path: str, batch_size: int = 1000):
         """Parses the entire repository into AST chunks and inserts them into SQLite."""
         filepaths = self._get_files(target_path)
+
+        MAX_FILE_SIZE_BYTES = 1024 * 1024 # 1 MB limit to prevent Tree-sitter memory exhaustion
         
         # Group documents by language for the parser
         docs_by_lang: Dict[str, List[Document]] = {}
         
         for path in filepaths:
+            if os.path.getsize(path) > MAX_FILE_SIZE_BYTES:
+                logging.warning(f"Skipping {path} since it exceeds 1MB size limit")
+                continue
+
             ext = os.path.splitext(path)[1]
             language = EXTENSION_TO_LANGUAGE.get(ext)
             if not language:
                 continue
                 
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
-            except UnicodeDecodeError:
-                continue # Skip binaries or malformed encodings
+            except Exception:
+                continue 
                 
             doc = Document(
                 text=content,
@@ -54,8 +61,12 @@ class IngestionEngine:
 
         # Parse and ingest per language
         for language, docs in docs_by_lang.items():
-            parser = CodeHierarchyNodeParser(language=language)
-            llama_nodes = parser.get_nodes_from_documents(docs)
+            try:
+                parser = CodeHierarchyNodeParser(language=language)
+                llama_nodes = parser.get_nodes_from_documents(docs)
+            except Exception as e:
+                logging.error(f"Error parsing {language} files: {e}")
+                continue
             
             for l_node in llama_nodes:
                 # Extract relationships
@@ -79,7 +90,7 @@ class IngestionEngine:
                 # Insert batch when it reaches the specified size
                 if len(batch) >= batch_size:
                     self.db.insert_nodes_batch(batch)
-                    batch.clear()
+                    batch = []
         # Flush any remaining nodes left over in the final partial batch
         if batch:
             self.db.insert_nodes_batch(batch)

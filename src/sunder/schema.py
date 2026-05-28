@@ -222,7 +222,7 @@ EXTENSION_TO_LANGUAGE = {
 }
 
 # Skip folders that are commonly ignored during code analysis
-SKIP_FOLDERS = (
+SKIP_FOLDERS = {
     # Python (.py)
     "__pycache__",
     "venv",
@@ -283,7 +283,7 @@ SKIP_FOLDERS = (
     "_build",
     "deps",
     "dist-newstyle"
-)
+}
 
 # A map to resolve Tree-sitter language IDs to file extensions
 LANGUAGE_EXTENSION_MAP = {

@@ -1,7 +1,8 @@
 import sqlite3
 import json
-from typing import List, Optional
+from typing import List
 from sunder.schema import CodeNode
+import re
 
 class KnowledgeDatabase:
     def __init__(self):
@@ -31,7 +32,7 @@ class KnowledgeDatabase:
             CREATE VIRTUAL TABLE code_nodes_fts USING fts5(
                 node_id UNINDEXED,
                 symbol_name,
-                tokenize='trigram'
+                tokenize='trigram case_sensitive 0'
             )
         """)
         self.conn.commit()
@@ -61,8 +62,7 @@ class KnowledgeDatabase:
         fts_data = [
             (
                 node.node_id,
-                node.symbol_name,
-                node.source_code
+                node.symbol_name
             )
             for node in nodes
         ]
@@ -75,18 +75,21 @@ class KnowledgeDatabase:
             """, code_nodes_data)
             
             cursor.executemany("""
-                INSERT INTO code_nodes_fts (node_id, symbol_name, source_code)
-                VALUES (?, ?, ?)
+                INSERT INTO code_nodes_fts (node_id, symbol_name)
+                VALUES (?, ?)
             """, fts_data)
 
-    def get_node(self, node_id: str) -> Optional[CodeNode]:
+    def get_node(self, node_id: str) -> CodeNode:
+        """Fetches a single node by its ID."""
+        if not node_id:
+            return None
+
         cursor = self.conn.cursor()
         cursor.execute("SELECT * FROM code_nodes WHERE node_id = ?", (node_id,))
         row = cursor.fetchone()
         
         if not row:
             return None
-            
         return CodeNode(
             node_id=row["node_id"],
             file_path=row["file_path"],
@@ -97,19 +100,64 @@ class KnowledgeDatabase:
             language=row["language"]
         )
 
-    def fuzzy_search_symbols(self, query: str, limit: int = 10) -> List[CodeNode]:
+    def get_nodes(self, node_ids: List[str]) -> List[CodeNode]:
+        """Fetches multiple nodes in a single DB roundtrip using an IN clause."""
+        if not node_ids:
+            return []
+            
+        cursor = self.conn.cursor()
+        placeholders = ",".join("?" * len(node_ids))
+        cursor.execute(f"SELECT * FROM code_nodes WHERE node_id IN ({placeholders})", tuple(node_ids))
+        
+        nodes = []
+        for row in cursor.fetchall():
+            nodes.append(CodeNode(
+                node_id=row["node_id"],
+                file_path=row["file_path"],
+                symbol_name=row["symbol_name"],
+                source_code=row["source_code"],
+                child_nodes=json.loads(row["child_nodes"]),
+                parent_nodes=json.loads(row["parent_nodes"]),
+                language=row["language"]
+            ))
+        return nodes
+ 
+    def fuzzy_search_symbols(self, query: str, limit: int = 10) -> List[tuple[str, str]]:
         """Used by the TUI for Human-In-The-Loop Target Disambiguation."""
         cursor = self.conn.cursor()
-        # FTS5 MATCH syntax
-        cursor.execute("""
-            SELECT node_id FROM code_nodes_fts 
-            WHERE symbol_name MATCH ? 
-            ORDER BY rank LIMIT ?
-        """, (f'"{query}"*', limit))
+
+        # Sanitize query to prevent FTS5 syntax errors
+        clean_query = query.strip().lower()
+        if not clean_query:
+            return []
+
+        # Trigrams need 3 chars minimum. For short queries, we use LIKE.
+        if len(clean_query) < 3:
+            cursor.execute("""
+                SELECT node_id, symbol_name FROM code_nodes_fts 
+                WHERE symbol_name LIKE ? 
+                ORDER BY length(symbol_name) ASC 
+                LIMIT ?
+            """, (f'%{clean_query}%', limit))
+            
+        # Pure trigram matching ordered by SQLite's internal BM25 ranking.
+        else:
+            # Extract only alphanumeric chunks resolve FTS5 syntax crash vulnerabilities.
+            parts = re.findall(r'\w+', clean_query)
+            
+            if not parts:
+                return []
+
+            clean_query = " ".join(parts)
+
+            cursor.execute("""
+                SELECT node_id, symbol_name FROM code_nodes_fts 
+                WHERE symbol_name MATCH ? 
+                ORDER BY rank 
+                LIMIT ?
+            """, (clean_query, limit))
         
         results = []
         for row in cursor.fetchall():
-            node = self.get_node(row["node_id"])
-            if node:
-                results.append(node)
+            results.append((row["node_id"], row["symbol_name"]))
         return results
