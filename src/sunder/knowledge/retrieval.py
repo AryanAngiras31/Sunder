@@ -11,8 +11,8 @@ class ContextRetriever:
         if not target_node:
             raise ValueError(f"Target node {target_node_id} not found in Knowledge Base.")
 
-        children = self.db.get_nodes(target_node.child_nodes[:10])     # Limit to 10 children
-        parents = self.db.get_nodes(target_node.parent_nodes[:5])      # Limit to 5 parents
+        children = self.db.get_nodes(target_node.child_nodes[:20]) # Limit to 20 children
+        parents = self.db.get_nodes(target_node.parent_nodes[:10]) # Limit to 10 parents
 
         return BlastRadiusContext(
             target_node=target_node,

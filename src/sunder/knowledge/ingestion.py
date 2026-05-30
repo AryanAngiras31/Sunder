@@ -2,7 +2,7 @@ import os
 from typing import Dict, List
 from llama_index.core import Document
 from llama_index.core.schema import NodeRelationship
-from llama_index.core.node_parser import CodeHierarchyNodeParser
+from sunder.knowledge.code_hierarchy import CodeHierarchyNodeParser
 from sunder.schema import CodeNode, EXTENSION_TO_LANGUAGE, SKIP_FOLDERS
 from sunder.knowledge.database import KnowledgeDatabase
 import logging

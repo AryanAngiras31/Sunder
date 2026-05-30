@@ -11,7 +11,8 @@ dependencies = [
     "docker>=7.0.0",
     "textual>=0.50.0",
     "langgraph>=0.0.20",
-    "tree-sitter>=0.21.0"
+    "tree-sitter>=0.21.0",
+    "llama-index-core>=0.14.22"
 ]
 
 [project.scripts]
