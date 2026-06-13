@@ -1,10 +1,8 @@
 import os
 from typing import Dict, List
-from sunder.knowledge.code_hierarchy import CodeHierarchyNodeParser
 from sunder.schema import CodeNode, EXTENSION_TO_LANGUAGE, SKIP_FOLDERS
 from sunder.knowledge.database import KnowledgeDatabase
 import logging
-import tree_sitter
 from tree_sitter_languages import get_parser 
 import uuid
 
@@ -95,5 +93,5 @@ class IngestionEngine:
 
         if batch:
             self.db.insert_nodes_batch(batch)
-            
+
         logging.info("Ingestion Complete.")
