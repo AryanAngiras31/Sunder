@@ -186,6 +186,7 @@ class SunderAgentState(BaseModel):
 # --- Constants ---
 
 # Map file extensions to Tree-sitter language identifiers
+# Map file extensions to Tree-sitter language identifiers (Aligned with Helix Queries)
 EXTENSION_TO_LANGUAGE = {
     # Core languages
     ".py": "python",
@@ -195,14 +196,16 @@ EXTENSION_TO_LANGUAGE = {
     ".java": "java",
     ".rs": "rust",
     ".c": "c",
+    ".h": "c",          
     ".cpp": "cpp",
-    ".cs": "c_sharp",  # Matches both "csharp" and "c#" from the map
+    ".hpp": "cpp",      
+    ".cs": "c-sharp",   
     ".rb": "ruby",
+    ".zig": "zig",
 
     # Enterprise & Mobile
     ".kt": "kotlin",
     ".swift": "swift",
-    ".m": "objective_c",
     
     # Web & Scripting
     ".php": "php",
@@ -213,12 +216,14 @@ EXTENSION_TO_LANGUAGE = {
 
     # Functional & Concurrency
     ".exs": "elixir",
+    ".ex": "elixir",   
     ".erl": "erlang",
     ".hs": "haskell",
     ".scala": "scala",
 
     # Infrastructure & Systems
-    ".bats": "shell"  # Covers both "shell" and "bash"
+    ".bats": "bash",   
+    ".sh": "bash"       
 }
 
 # Skip folders that are commonly ignored during code analysis
@@ -229,63 +234,56 @@ SKIP_FOLDERS = {
     "env",
     "htmlcov",
     "site-packages",
+    "eggs",
+    "wheels",
     
-    # JavaScript / TypeScript (.js, .ts)
+    # JavaScript / TypeScript / Web (.js, .ts, .css, .html)
     "node_modules",
     "bower_components",
     "dist",
     "out",
     "build",
+    "coverage",
     
-    # Go (.go)
+    # Go / PHP / Ruby (.go, .php, .rb)
     "vendor",
+    "bundle",
     
     # Java / Kotlin / Scala (.java, .kt, .scala)
     "target",
     "bin",
-    "build",
-    "out",
     
-    # Rust (.rs)
-    "target",
-    
-    # C / C++ (.c, .cpp)
-    "build",
+    # C / C++ / C# / Rust (.c, .cpp, .cs, .rs)
+    "obj",
+    "Debug",
+    "Release",
     "cmake-build-debug",
     "cmake-build-release",
-    "obj",
     
-    # C# (.cs)
-    "bin",
-    "obj",
-    
-    # Ruby (.rb)
-    "vendor",
-    "bundle",
-    
-    # Swift / Objective-C (.swift, .m)
+    # Mobile (Swift / Objective-C)
     "Carthage",
     "Pods",
     "DerivedData",
     
-    # PHP (.php)
-    "vendor",
-    
-    # Dart (.dart)
-    "build",
+    # Dart / Flutter (.dart)
     "tool",
     
     # Perl / Lua / R (.t, .lua, .R)
     "blib",
     "lua_modules",
     
-    # Elixir / Erlang / Haskell (.exs, .erl, .hs)
+    # Functional (Elixir, Erlang, Haskell)
     "_build",
     "deps",
-    "dist-newstyle"
+    "dist-newstyle",
+    
+    # Zig (.zig)
+    "zig-cache",
+    "zig-out"
 }
 
 # A map to resolve Tree-sitter language IDs to file extensions
+# A map to resolve Tree-sitter language IDs to conventional test file extensions
 LANGUAGE_EXTENSION_MAP = {
     # Core languages
     "python": ".py",              # Pytest / Unittest
@@ -297,13 +295,13 @@ LANGUAGE_EXTENSION_MAP = {
     "rust": ".rs",                # Cargo test (usually integrated or tests/ folder)
     "c": ".c",                    # Unity / CMocka
     "cpp": ".cpp",                # Google Test / Catch2
+    "c-sharp": "Tests.cs",        # xUnit / NUnit (Aligned with Helix)
+    "zig": "_test.zig",           # Zig test blocks
 
     # Enterprise & Mobile
-    "csharp": "Tests.cs",         # xUnit / NUnit
-    "c#": "Tests.cs",             # Alias for Tree-sitter variations
     "kotlin": "Test.kt",          # JUnit / Kotest
     "swift": "Tests.swift",       # XCTest
-    "objective-c": "Tests.m",     # XCTest
+    # "objective_c": "Tests.m",   # Commented out as Helix lacks default queries
     
     # Web & Scripting
     "php": "Test.php",            # PHPUnit
@@ -319,6 +317,5 @@ LANGUAGE_EXTENSION_MAP = {
     "scala": "Spec.scala",        # ScalaTest
 
     # Infrastructure & Systems
-    "shell": ".bats",             # Bash Automated Testing System
-    "bash": ".bats",              # Alias
+    "bash": ".bats",              # Bash Automated Testing System (Aligned with Helix)
 }

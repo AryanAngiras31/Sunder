@@ -1,11 +1,12 @@
 import os
 from typing import Dict, List
-from llama_index.core import Document
-from llama_index.core.schema import NodeRelationship
 from sunder.knowledge.code_hierarchy import CodeHierarchyNodeParser
 from sunder.schema import CodeNode, EXTENSION_TO_LANGUAGE, SKIP_FOLDERS
 from sunder.knowledge.database import KnowledgeDatabase
 import logging
+import tree_sitter
+from tree_sitter_languages import get_parser 
+import uuid
 
 class IngestionEngine:
     def __init__(self, db: KnowledgeDatabase):
@@ -16,81 +17,83 @@ class IngestionEngine:
         Return all files that need to be parsed for knowledge extraction.
         """
         valid_extensions = tuple(EXTENSION_TO_LANGUAGE.keys())
-        filepaths = []
+        filepath_language_dict = {}
         for root, dirs, files in os.walk(target_path):
             # Skip hidden directories and standard build folders
             dirs[:] = [d for d in dirs if not d.startswith('.') and d not in SKIP_FOLDERS]
             for file in files:
-                if file.endswith(valid_extensions):
-                    filepaths.append(os.path.join(root, file))
-        return filepaths
+                ext = f".{file.split('.')[-1]}"
+                if ext in valid_extensions:
+                    # map path to language
+                    filepath_language_dict[os.path.join(root, file)] = EXTENSION_TO_LANGUAGE[ext]
+        return filepath_language_dict
 
     def ingest_repository(self, target_path: str, batch_size: int = 1000):
         """Parses the entire repository into AST chunks and inserts them into SQLite."""
-        filepaths = self._get_files(target_path)
-
-        MAX_FILE_SIZE_BYTES = 1024 * 1024 # 1 MB limit to prevent Tree-sitter memory exhaustion
-        
-        # Group documents by language for the parser
-        docs_by_lang: Dict[str, List[Document]] = {}
-        
-        for path in filepaths:
-            if os.path.getsize(path) > MAX_FILE_SIZE_BYTES:
-                logging.warning(f"Skipping {path} since it exceeds 1MB size limit")
-                continue
-
-            ext = os.path.splitext(path)[1]
-            language = EXTENSION_TO_LANGUAGE.get(ext)
-            if not language:
-                continue
-                
-            try:
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read()
-            except Exception:
-                continue 
-                
-            doc = Document(
-                text=content,
-                metadata={"file_path": os.path.relpath(path, target_path)}
-            )
-            docs_by_lang.setdefault(language, []).append(doc)
-
-        # Active batch memory cache
+        filepath_language_dict = self._get_files(target_path)
         batch: List[CodeNode] = []
+        
+        logging.info(f"Found {len(filepath_language_dict)} files to ingest.")
 
-        # Parse and ingest per language
-        for language, docs in docs_by_lang.items():
+        for filepath, lang in filepath_language_dict.items():
+            # Read the bytes from the target file for parsing 
             try:
-                parser = CodeHierarchyNodeParser(language=language)
-                llama_nodes = parser.get_nodes_from_documents(docs)
+                with open(filepath, 'rb') as f:
+                    source_bytes = f.read()
             except Exception as e:
-                logging.error(f"Error parsing {language} files: {e}")
+                logging.warning(f"Could not read bytes for {filepath}:\n", e)
                 continue
-            
-            for l_node in llama_nodes:
-                # Extract relationships
-                child_ids = [rel.node_id for rel in l_node.relationships.get(NodeRelationship.CHILD, [])]
-                parent_ids = [rel.node_id for rel in l_node.relationships.get(NodeRelationship.PARENT, [])]
-                
-                # Sunder defines 'symbol_name' as the structural signature
-                symbol_name = l_node.metadata.get("inclusive_scopes", [{}])[-1].get("name", "global_scope")
-                
-                code_node = CodeNode(
-                    node_id=l_node.node_id,
-                    file_path=l_node.metadata.get("file_path"),
-                    symbol_name=symbol_name,
-                    source_code=l_node.text,
-                    child_nodes=child_ids,
-                    parent_nodes=parent_ids,
-                    language=language
-                )
-                batch.append(code_node)
 
-                # Insert batch when it reaches the specified size
+            # Create AST for a particular file 
+            parser = get_parser(lang)
+            tree = parser.parse(source = source_bytes)
+
+            # Execute the corresponding query for every language supported
+            language = get_language(lang)
+            query_tags_path = os.path.join('queries', lang, 'tags.scm')
+
+            if not os.path.exists(query_tags_path):
+                logging.warning(f"Missing tags.scm for {lang} at {query_path}")
+                continue
+            with open(query_tags_path, 'r') as f:
+                def_query_str = f.read()
+
+            def_query = language.query(def_query_str)
+            matches = def_query.matches(node = tree.root_node)
+
+            # First create a record for every function 
+            filename = os.path.basename(filepath)
+            for match in matches:
+                captures = match[1]
+                if 'definition.function' or 'name' not in captures:
+                    continue
+
+                def_node = captures['definition.function'][0]
+                name_node = captures['name'][0]
+
+                source_code = def_node.text.decode('utf-8')
+                symbol_name = name_node.text.decode('utf-8')
+
+                # Create a deterministic uuid by combining the filename with the function name
+                func_id = uuid.uuid5(namespace = uuid.NAMESPACE_URL, name = f"{filename}:{symbol_name}")
+
+                code_node = CodeNode(
+                    node_id = func_id,
+                    file_path = filepath,
+                    symbol_name = symbol_name,
+                    source_code = source_code,
+                    child_nodes = [],
+                    parent_nodes = [],
+                    language = lang
+                )
+
+                # Batch insert the code nodes into the database
+                batch.append(code_node)
                 if len(batch) >= batch_size:
                     self.db.insert_nodes_batch(batch)
                     batch = []
-        # Flush any remaining nodes left over in the final partial batch
+
         if batch:
             self.db.insert_nodes_batch(batch)
+            
+        logging.info("Ingestion Complete.")
