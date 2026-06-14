@@ -4,10 +4,19 @@ from enum import Enum
 
 # Knowledge Layer schema
 
+class NodeType(str, Enum):
+    FUNCTION = "function"
+    METHOD = "method"
+    CLASS = "class"
+
 class CodeNode(BaseModel):
     """Represents a single logical chunk of the enterprise codebase."""
     node_id: str = Field(
         description="Unique UUID for the AST chunk."
+    )
+    node_type: NodeType = Field(
+        default=NodeType.FUNCTION, 
+        description="Categorizes the node to determine prompt structure."
     )
     file_path: str = Field(
         description="Relative path in the repository (e.g., src/auth/jwt.py)."

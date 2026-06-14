@@ -3,7 +3,7 @@ from typing import Dict, List
 from sunder.schema import CodeNode, EXTENSION_TO_LANGUAGE, SKIP_FOLDERS
 from sunder.knowledge.database import KnowledgeDatabase
 import logging
-from tree_sitter_languages import get_parser 
+from tree_sitter_languages import get_parser, get_language
 import uuid
 
 class IngestionEngine:
@@ -20,7 +20,7 @@ class IngestionEngine:
             # Skip hidden directories and standard build folders
             dirs[:] = [d for d in dirs if not d.startswith('.') and d not in SKIP_FOLDERS]
             for file in files:
-                ext = f".{file.split('.')[-1]}"
+                ext = os.path.splitext(file)[1]
                 if ext in valid_extensions:
                     # map path to language
                     filepath_language_dict[os.path.join(root, file)] = EXTENSION_TO_LANGUAGE[ext]
@@ -42,16 +42,21 @@ class IngestionEngine:
                 logging.warning(f"Could not read bytes for {filepath}:\n", e)
                 continue
 
+            language = get_language(lang)
+
             # Create AST for a particular file 
-            parser = get_parser(lang)
+            try:
+                parser = tree_sitter.Parser(language)
+            except TypeError:
+                parser = tree_sitter.Parser()
+                parser.set_language(language)
             tree = parser.parse(source = source_bytes)
 
             # Execute the corresponding query for every language supported
-            language = get_language(lang)
             query_tags_path = os.path.join('queries', lang, 'tags.scm')
 
             if not os.path.exists(query_tags_path):
-                logging.warning(f"Missing tags.scm for {lang} at {query_path}")
+                logging.warning(f"Missing tags.scm for {lang} at {query_tags_path}")
                 continue
             with open(query_tags_path, 'r') as f:
                 def_query_str = f.read()
@@ -63,20 +68,39 @@ class IngestionEngine:
             filename = os.path.basename(filepath)
             for match in matches:
                 captures = match[1]
-                if 'definition.function' or 'name' not in captures:
+                
+                # Find the specific definition key ('definition.function', 'definition.class', 'definition.method')
+                def_key = next((k for k in captures.keys() if k.startswith('definition')), None)
+                
+                if 'name' not in captures or not def_key:
                     continue
 
-                def_node = captures['definition.function'][0]
+                # Extract the specific tag type (e.g., 'function', 'class', 'struct', 'constant')
+                tag_type = def_key.split('.')[-1]
+                
+                # Get node type
+                if tag_type in {'function', 'macro'}:
+                    node_type = NodeType.FUNCTION
+                elif tag_type == 'method':
+                    node_type = NodeType.METHOD
+                elif tag_type in {'class', 'struct', 'interface', 'trait'}:
+                    node_type = NodeType.CLASS
+                else:
+                    # Ignore constants, variables, types, modules, etc.
+                    continue
+
+                def_node = captures[def_key][0]
                 name_node = captures['name'][0]
 
                 source_code = def_node.text.decode('utf-8')
                 symbol_name = name_node.text.decode('utf-8')
 
-                # Create a deterministic uuid by combining the filename with the function name
-                func_id = uuid.uuid5(namespace = uuid.NAMESPACE_URL, name = f"{filename}:{symbol_name}")
+                # Create a deterministic uuid by combining the start byte with the function name
+                func_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{filepath}:{def_node.start_byte}:{symbol_name}"))
 
                 code_node = CodeNode(
                     node_id = func_id,
+                    node_type=node_type,
                     file_path = filepath,
                     symbol_name = symbol_name,
                     source_code = source_code,
