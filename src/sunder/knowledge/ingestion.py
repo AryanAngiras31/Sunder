@@ -94,8 +94,8 @@ class IngestionEngine:
                     # Ignore constants, variables, types, modules, etc.
                     continue
 
-                def_node = captures[def_key][0]
-                name_node = captures['name'][0]
+                def_node = captures[def_key]
+                name_node = captures['name']
 
                 source_code = def_node.text.decode('utf-8')
                 symbol_name = name_node.text.decode('utf-8')
