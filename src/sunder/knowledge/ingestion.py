@@ -1,6 +1,6 @@
 import os
 from typing import Dict, List
-from sunder.schema import CodeNode, EXTENSION_TO_LANGUAGE, SKIP_FOLDERS
+from sunder.schema import CodeNode, NodeType, EXTENSION_TO_LANGUAGE, SKIP_FOLDERS
 from sunder.knowledge.database import KnowledgeDatabase
 import logging
 from tree_sitter_languages import get_parser, get_language
@@ -41,16 +41,12 @@ class IngestionEngine:
             except Exception as e:
                 logging.warning(f"Could not read bytes for {filepath}:\n", e)
                 continue
-
+            
+            # Build AST for this file
             language = get_language(lang)
-
-            # Create AST for a particular file 
-            try:
-                parser = tree_sitter.Parser(language)
-            except TypeError:
-                parser = tree_sitter.Parser()
-                parser.set_language(language)
-            tree = parser.parse(source = source_bytes)
+            parser = get_parser(lang)
+            
+            tree = parser.parse(source_bytes)
 
             # Execute the corresponding query for every language supported
             query_tags_path = os.path.join('queries', lang, 'tags.scm')
