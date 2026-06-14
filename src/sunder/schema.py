@@ -210,7 +210,6 @@ EXTENSION_TO_LANGUAGE = {
     ".hpp": "cpp",      
     ".cs": "c-sharp",   
     ".rb": "ruby",
-    ".zig": "zig",
 
     # Enterprise & Mobile
     ".kt": "kotlin",
@@ -284,11 +283,7 @@ SKIP_FOLDERS = {
     # Functional (Elixir, Erlang, Haskell)
     "_build",
     "deps",
-    "dist-newstyle",
-    
-    # Zig (.zig)
-    "zig-cache",
-    "zig-out"
+    "dist-newstyle"
 }
 
 # A map to resolve Tree-sitter language IDs to file extensions
@@ -305,7 +300,6 @@ LANGUAGE_EXTENSION_MAP = {
     "c": ".c",                    # Unity / CMocka
     "cpp": ".cpp",                # Google Test / Catch2
     "c-sharp": "Tests.cs",        # xUnit / NUnit (Aligned with Helix)
-    "zig": "_test.zig",           # Zig test blocks
 
     # Enterprise & Mobile
     "kotlin": "Test.kt",          # JUnit / Kotest

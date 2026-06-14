@@ -1,5 +1,6 @@
 import os
 from typing import Dict, List
+
 from sunder.schema import CodeNode, NodeType, EXTENSION_TO_LANGUAGE, SKIP_FOLDERS
 from sunder.knowledge.database import KnowledgeDatabase
 import logging
@@ -42,14 +43,18 @@ class IngestionEngine:
                 logging.warning(f"Could not read bytes for {filepath}:\n", e)
                 continue
             
-            # Build AST for this file
-            language = get_language(lang)
-            parser = get_parser(lang)
+            try:
+                language = get_language(lang)
+            except (AttributeError, Exception) as e:
+                logging.warning(f"Skipping {lang}: Parser not bundled in tree_sitter_languages.")
+                continue
             
+            # Build AST for this file
+            parser = get_parser(lang)
             tree = parser.parse(source_bytes)
 
             # Execute the corresponding query for every language supported
-            query_tags_path = os.path.join('queries', lang, 'tags.scm')
+            query_tags_path = os.path.join(os.path.dirname(__file__), 'queries', lang, 'tags.scm')
 
             if not os.path.exists(query_tags_path):
                 logging.warning(f"Missing tags.scm for {lang} at {query_tags_path}")
@@ -57,11 +62,15 @@ class IngestionEngine:
             with open(query_tags_path, 'r') as f:
                 def_query_str = f.read()
 
-            def_query = language.query(def_query_str)
+            try:
+                def_query = language.query(def_query_str)
+            except Exception as e:
+                logging.warning(f"Skipping {lang}: tags.scm is incompatible with the bundled grammar binary. ({e})")
+                continue
+
             matches = def_query.matches(node = tree.root_node)
 
             # First create a record for every function 
-            filename = os.path.basename(filepath)
             for match in matches:
                 captures = match[1]
                 
