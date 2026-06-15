@@ -28,18 +28,26 @@ class ContextManager:
                 parents=[]
             )
 
+        # Prune the children so that they fit within the context window
+        # Sort the children by increasing size to maximuze usage examples
+        sorted_children = sorted(context.children, key=lambda c: len(c.source_code))
+
         pruned_children = []
-        for child in context.children:
+        for child in sorted_children:
             child_tokens = len(self.encoder.encode(child.source_code))
             if current_tokens + child_tokens <= self.max_tokens:
                 pruned_children.append(child)
                 current_tokens += child_tokens
             else:
                 break # Token limit reached
+            
+        # Prune the parents so that they fit within the context window
+        # Sort the parents by increasing size to maximuze usage examples
+        sorted_parents = sorted(context.parents, key=lambda p: len(p.source_code))
 
         pruned_parents = []
         if current_tokens < self.max_tokens:
-            for parent in context.parents:
+            for parent in sorted_parents:
                 parent_tokens = len(self.encoder.encode(parent.source_code))
                 if current_tokens + parent_tokens <= self.max_tokens:
                     pruned_parents.append(parent)

@@ -103,13 +103,14 @@ class IngestionEngine:
                 source_code = def_node.text.decode('utf-8')
                 symbol_name = name_node.text.decode('utf-8')
 
-                # Create a deterministic uuid by combining the start byte with the function name
-                func_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{filepath}:{def_node.start_byte}:{symbol_name}"))
+                # Create a deterministic uuid by combining the fileapth and start byte with the function name
+                rel_path = os.path.relpath(filepath, target_path)
+                func_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{rel_path}:{def_node.start_byte}:{symbol_name}"))
 
                 code_node = CodeNode(
                     node_id = func_id,
                     node_type=node_type,
-                    file_path = filepath,
+                    file_path = rel_path,
                     symbol_name = symbol_name,
                     source_code = source_code,
                     child_nodes = [],
