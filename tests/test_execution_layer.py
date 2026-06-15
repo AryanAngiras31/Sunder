@@ -38,7 +38,7 @@ def sandbox_profile():
 
 # --- BOOTSTRAPPER TESTS ---
 
-def test_bootstrapper_builds_image(dummy_target_repo, sandbox_profile):
+def test_bootstrapper_builds_image(dummy_target_repo):
     bootstrapper = Bootstrapper()
     
     # Should build the image and return a tag like 'sunder-sandbox:abcdef123456'
@@ -53,7 +53,7 @@ def test_bootstrapper_missing_dockerfile(tmp_path):
     os.makedirs(empty_repo)
     
     with pytest.raises(FileNotFoundError, match="Strict Enforcement Failed"):
-         bootstrapper.ensure_environment(empty_repo)
+        bootstrapper.ensure_environment(empty_repo)
 
 # --- SANDBOX TESTS ---
 
