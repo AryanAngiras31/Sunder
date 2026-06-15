@@ -1,5 +1,8 @@
 import tiktoken
 from sunder.schema import BlastRadiusContext
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ContextManager:
     def __init__(self, max_tokens: int = 20000):
@@ -15,7 +18,10 @@ class ContextManager:
         current_tokens = len(self.encoder.encode(context.target_node.source_code))
         
         if current_tokens > self.max_tokens:
-            # Target alone is too massive (edge case, but handled defensively)
+            logger.warning(
+                f"Target node {context.target_node.node_id} is ({current_tokens} tokens long, exceeding max limit of {self.max_tokens}."
+            )
+            # Target alone is too large (handled defensively)
             return BlastRadiusContext(
                 target_node=context.target_node,
                 children=[],
@@ -40,6 +46,16 @@ class ContextManager:
                     current_tokens += parent_tokens
                 else:
                     break # Token limit reached
+
+        children_dropped = len(pruned_children) - len(context.children)
+        parents_dropped = len(pruned_parents) - len(context.parents)
+        if children_dropped > 0 or parents_dropped > 0:
+            logger.debug(
+                f"Token limit reached ({current_tokens}/{self.max_tokens})."
+                f"Pruned {children_dropped} children and {parents_dropped} parents."
+            )
+        else:
+            logger.debug(f"Context fits within budget. Total tokens: {current_tokens}/{self.max_tokens}")
 
         return BlastRadiusContext(
             target_node=context.target_node,

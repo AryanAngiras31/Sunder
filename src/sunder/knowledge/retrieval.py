@@ -1,5 +1,8 @@
 from sunder.knowledge.database import KnowledgeDatabase
-from sunder.schema import BlastRadiusContext, CodeNode
+from sunder.schema import BlastRadiusContext
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ContextRetriever:
     def __init__(self, db: KnowledgeDatabase):
@@ -9,10 +12,16 @@ class ContextRetriever:
         """Fetches the Target, its Children (mock targets), and its Parents (usage examples)."""
         target_node = self.db.get_node(target_node_id)
         if not target_node:
+            logger.error(f"Failed to build blast radius: Target node {target_node_id} not found.")
             raise ValueError(f"Target node {target_node_id} not found in Knowledge Base.")
 
         children = self.db.get_nodes(target_node.child_nodes[:20]) # Limit to 20 children
         parents = self.db.get_nodes(target_node.parent_nodes[:10]) # Limit to 10 parents
+
+        logger.info(
+            f"Assembled blast radius for target '{target_node.symbol_name}' "
+            f"({len(children)} children, {len(parents)} parents)"
+        )
 
         return BlastRadiusContext(
             target_node=target_node,
