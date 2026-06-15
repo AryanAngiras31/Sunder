@@ -40,7 +40,7 @@ class SandboxExecutor:
                 # Mount the temporary test script directory
                 os.path.abspath(temp_dir): {
                     'bind': '/sunder_test', 
-                    'mode': 'ro'
+                    'mode': 'rw'
                 }
             }
 

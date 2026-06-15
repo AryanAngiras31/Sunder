@@ -67,6 +67,10 @@ class SandboxProfile(BaseModel):
         default_factory=dict,
         description="Key-value pairs of environment variables injected into the container (e.g., configuration overrides or poison pill credentials)."
     )
+    custom_image: str = Field(
+        default=None,
+        description="The name of the pre-built Docker image to use. Passed down by the Bootstrapper."
+    )
 
 class ExecutionReport(BaseModel):
     """Raw data returned from the Docker Sandbox."""

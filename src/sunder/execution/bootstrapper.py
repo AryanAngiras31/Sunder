@@ -23,7 +23,11 @@ class Bootstrapper:
         dockerfile_path = os.path.join(sunder_dir, "Dockerfile")
         
         if not os.path.exists(dockerfile_path):
-            raise FileNotFoundError(f"Strict Enforcement Failed: Expected `.sunder/Dockerfile` in {target_path} but it was not found.")
+            raise FileNotFoundError(
+                f"Strict Enforcement Failed: Expected `.sunder/Dockerfile` in {target_path} but it was not found."
+                f"Sunder requires explicit environment definitions to ensure safety. "
+                f"Please create one in {target_path}."
+            )
         
         # Hash the Dockerfile to check if we need to rebuild
         file_hash = self._get_file_hash(dockerfile_path)[:12]
