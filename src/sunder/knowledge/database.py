@@ -148,8 +148,11 @@ class KnowledgeDatabase:
 
         return nodes
  
-    def fuzzy_search_symbols(self, query: str, limit: int = 10) -> List[tuple[str, str]]:
-        """Used by the TUI for Human-In-The-Loop Target Disambiguation."""
+    def fuzzy_search_symbols(self, query: str, limit: int = 10) -> List[tuple[str, str, str, str]]:
+        """
+        Used by the TUI for Human-In-The-Loop Target Disambiguation.
+        Returns: List of (node_id, symbol_name, node_type, file_path)
+        """
         cursor = self.conn.cursor()
 
         # Sanitize query to prevent FTS5 syntax errors
@@ -160,9 +163,11 @@ class KnowledgeDatabase:
         # Trigrams need 3 chars minimum. For short queries, we use LIKE.
         if len(clean_query) < 3:
             cursor.execute("""
-                SELECT node_id, symbol_name FROM code_nodes_fts 
-                WHERE symbol_name LIKE ? 
-                ORDER BY length(symbol_name) ASC 
+                SELECT f.node_id, f.symbol_name, c.node_type, c.file_path 
+                FROM code_nodes_fts f
+                JOIN code_nodes c ON f.node_id = c.node_id
+                WHERE f.symbol_name LIKE ? 
+                ORDER BY length(f.symbol_name) ASC 
                 LIMIT ?
             """, (f'%{clean_query}%', limit))
             
@@ -177,15 +182,22 @@ class KnowledgeDatabase:
             clean_query = " ".join(parts)
 
             cursor.execute("""
-                SELECT node_id, symbol_name FROM code_nodes_fts 
-                WHERE symbol_name MATCH ? 
-                ORDER BY rank 
+                SELECT f.node_id, f.symbol_name, c.node_type, c.file_path 
+                FROM code_nodes_fts f
+                JOIN code_nodes c ON f.node_id = c.node_id
+                WHERE f.symbol_name MATCH ? 
+                ORDER BY f.rank 
                 LIMIT ?
             """, (clean_query, limit))
         
         results = []
         for row in cursor.fetchall():
-            results.append((row["node_id"], row["symbol_name"]))
+            results.append((
+                row["node_id"], 
+                row["symbol_name"], 
+                row["node_type"], 
+                row["file_path"]
+            ))
         
         logger.debug(f"Found {len(results)} matches for '{query}'")
 
