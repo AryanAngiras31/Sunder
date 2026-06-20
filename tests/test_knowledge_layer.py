@@ -256,3 +256,45 @@ def test_ingest_all_languages(tmp_path, empty_db, caplog):
     print("="*50 + "\n")
     
     assert len(succeeded_langs) > 0, "At least some core languages should have parsed."
+
+def test_ingestion_nested_repository_traversal(tmp_path, empty_db):
+    """
+    Tests that the IngestionEngine correctly traverses nested directories, 
+    identifies multiple languages, and respects the SKIP_FOLDERS rules.
+    """
+    # Create a realistic, nested directory structure
+    (tmp_path / "src" / "api").mkdir(parents=True)
+    (tmp_path / "src" / "utils").mkdir(parents=True)
+    (tmp_path / "node_modules" / "express").mkdir(parents=True) # Should be skipped
+    (tmp_path / ".git" / "objects").mkdir(parents=True)         # Should be skipped (hidden)
+
+    # Populate with valid code files
+    (tmp_path / "src" / "api" / "server.py").write_text("def start_server(): pass")
+    (tmp_path / "src" / "utils" / "math.go").write_text("func Add() int { return 1 }")
+    
+    # Populate skip folders with valid code files (to ensure they are ignored)
+    (tmp_path / "node_modules" / "express" / "index.js").write_text("function bad() { return 1; }")
+    (tmp_path / ".git" / "objects" / "hidden.py").write_text("def invisible(): pass")
+    
+    # Populate with an unsupported file extension
+    (tmp_path / "src" / "notes.txt").write_text("Just some notes.")
+
+    engine = IngestionEngine(empty_db)
+    engine.ingest_repository(str(tmp_path))
+
+    # Query the DB to verify exact ingestion results
+    cursor = empty_db.conn.cursor()
+    cursor.execute("SELECT file_path, symbol_name FROM code_nodes")
+    ingested_nodes = cursor.fetchall()
+    
+    assert len(ingested_nodes) == 2, "Only server.py and math.go should be ingested."
+    
+    paths = [row["file_path"] for row in ingested_nodes]
+    symbols = [row["symbol_name"] for row in ingested_nodes]
+    
+    assert "start_server" in symbols
+    assert "Add" in symbols
+    
+    # Prove that SKIP_FOLDERS and hidden directory logic worked
+    assert not any("node_modules" in path for path in paths)
+    assert not any(".git" in path for path in paths)
