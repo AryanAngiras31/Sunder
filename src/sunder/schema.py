@@ -183,6 +183,10 @@ class SunderAgentState(BaseModel):
         default=0,
         description="The current iteration number of the agentic loop. Used by the router to prevent infinite loops."
     )
+    max_retries: int = Field(
+        default=3,
+        description="The maximum number of times the Evaluator will route back to a Coder node before forcing termination."
+    )
     status: AgentStatus = Field(
         default=AgentStatus.PENDING,
         description="The overarching status of the LangGraph state machine execution."
