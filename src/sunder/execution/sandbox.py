@@ -39,7 +39,7 @@ class SandboxExecutor:
                 },
                 # Mount the temporary test script directory
                 os.path.abspath(temp_dir): {
-                    'bind': '/app/sunder_test', 
+                    'bind': '/sunder_test', 
                     'mode': 'rw'
                 }
             }
@@ -47,6 +47,11 @@ class SandboxExecutor:
             start_time = time.time()
             container = None
             timed_out = False
+
+            # Inject env variables to allow the tests to import code from the ro user code
+            env_vars = sandbox_profile.environment_vars.copy()
+            env_vars["PYTHONPATH"] = "/app"
+            env_vars["PYTHONDONTWRITEBYTECODE"] = "1"
             
             try:
                 # Start the container in detached mode so we can manually enforce timeouts
@@ -57,7 +62,7 @@ class SandboxExecutor:
                     network_mode=sandbox_profile.network_mode.value,
                     mem_limit=sandbox_profile.memory_limit,
                     cpu_quota=int(sandbox_profile.cpu_quota * 100000),   # Convert fractional CPU to Docker's cpu_quota (100000 = 1 core)
-                    environment=sandbox_profile.environment_vars,
+                    environment=env_vars,
                     detach=True
                 )
 

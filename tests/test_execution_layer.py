@@ -12,6 +12,12 @@ def dummy_target_repo(tmp_path):
     target_dir = tmp_path / "mock_repo"
     target_dir.mkdir()
     
+    # Create mock enterprise code to test cross-mount importing
+    src_dir = target_dir / "src"
+    src_dir.mkdir()
+    math_logic = src_dir / "calculator.py"
+    math_logic.write_text("def add(a, b):\n    return a + b\n")
+    
     sunder_dir = target_dir / ".sunder"
     sunder_dir.mkdir()
     
@@ -77,6 +83,32 @@ def test_sandbox_clean_execution(dummy_target_repo, sandbox_profile):
     assert "active" in report.stdout # Checks environment variable injection
     assert report.timed_out is False
     assert report.oom_killed is False
+
+def test_sandbox_cross_mount_import(dummy_target_repo, sandbox_profile):
+    """Tests if the isolated test script can successfully import from the read-only enterprise mount."""
+    bootstrapper = Bootstrapper()
+    image_tag = bootstrapper.ensure_environment(dummy_target_repo)
+    
+    sandbox = SandboxExecutor()
+    
+    # This script lives in /sunder_test but imports from /app/src
+    test_script = (
+        "from src.calculator import add\n"
+        "result = add(10, 5)\n"
+        "print(f'Sunder Calculation: {result}')\n"
+    )
+    
+    report = sandbox.run_test(
+        target_path=dummy_target_repo,
+        image_tag=image_tag,
+        test_script=test_script,
+        sandbox_profile=sandbox_profile,
+        language="python"
+    )
+    
+    assert report.exit_code == 0, f"Execution failed. Stderr: {report.stderr}"
+    assert "Sunder Calculation: 15" in report.stdout
+    assert report.timed_out is False
 
 def test_sandbox_timeout_enforcement(dummy_target_repo, sandbox_profile):
     bootstrapper = Bootstrapper()
