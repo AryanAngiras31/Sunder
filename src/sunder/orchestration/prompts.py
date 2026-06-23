@@ -33,23 +33,18 @@ BASELINE_CODER_PROMPT = ChatPromptTemplate.from_messages([
 ADVERSARY_CODER_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system", 
-        "You are a senior application security engineer specializing in automated vulnerability discovery and resilience testing. "
-        "Your objective is to write a comprehensive, automated test suite targeting the provided function, its dependencies, "
-        "and its behavior under production-like stress.\n\n"
+        "You are a senior application security engineer specializing in automated vulnerability discovery. "
+        "Your objective is to write a targeted, highly malicious test script targeting the provided function.\n\n"
         "REQUIREMENTS:\n"
         "1. AUTHENTICATION RESILIENCE: Use the provided Seeded Credentials to assess authorization boundaries and test for privilege escalation.\n\n"
-        "2. DEPENDENCY IMPLICATION ANALYSIS: Analyze the source code to identify imported external libraries or tools. "
-        "Based on your knowledge base, target known architectural weaknesses or historical vulnerability patterns common to "
-        "those specific libraries (e.g., specific parser vulnerabilities, unsafe deserialization routines, or injection vectors).\n\n"
-        "3. GENERIC FUZZING & MUTATION: Implement a generic fuzzing engine or data-generation loop within the test script. "
-        "Subject the function inputs to heavily mutated data, boundary values, null bytes, excessively large payloads, "
-        "and invalid encodings to uncover unhandled edge-cases.\n\n"
-        "4. PRODUCTION ENVIRONMENT SIMULATION: Generate test cases that replicate production stress factors, such as "
-        "high-concurrency inputs, resource exhaustion scenarios, and boundary conditions that could cause unhandled exceptions "
-        "or denial of service.\n\n"
-        "5. ASSERTION STRATEGY: Write explicit `assert` statements to capture silent data corruption, memory leaks, "
+        "2. TARGETED FUZZING: Subject the function inputs to maliciously mutated data, boundary values, null bytes, "
+        "excessively large payloads, and invalid encodings. Do NOT write infinite loops or massive data-generation "
+        "engines. The test runs in a sandbox with a tight execution timeout.\n\n"
+        "3. DEPENDENCY IMPLICATION: Analyze the function logic to identify implied dependencies (e.g., ORM calls, "
+        "deserialization routines). Exploit known weaknesses typical for those operations.\n\n"
+        "4. ASSERTION STRATEGY: Write explicit `assert` statements to capture silent data corruption, memory leaks, "
         "improper error handling, or state leakage.\n\n"
-        "6. FORMATTING: Output ONLY the raw test script code inside a markdown code block."
+        "5. FORMATTING: Output ONLY the raw test script code inside a markdown code block."
     ),
     (
         "user", 
@@ -104,7 +99,6 @@ ADVERSARY_EVALUATOR_PROMPT = ChatPromptTemplate.from_messages([
         "REQUIREMENTS:\n"
         "1. If SYNTAX_ERROR, output precise 'feedback' instructing the coder on exactly how to fix the provided test script.\n"
         "2. If SYSTEM_SECURE, analyze the target function and the failed test script, then suggest a brief, entirely new adversarial attack vector for the next attempt in the 'feedback' field.\n"
-        "3. Do NOT extract any tokens or seeded entities in this mode."
     ),
     (
         "user", 
