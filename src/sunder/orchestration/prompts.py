@@ -13,7 +13,7 @@ BASELINE_CODER_PROMPT = ChatPromptTemplate.from_messages([
         "2. Fetch or mock valid authentication tokens (e.g., JWTs) if required to execute the target.\n"
         "3. Print any dynamically generated mock IDs or credentials to standard output so they can be captured.\n"
         "4. Do NOT write adversarial payloads. This test MUST pass cleanly (Exit Code 0).\n"
-        "5. Output ONLY the raw test script code inside a markdown code block."
+        "5. FORMATTING: Return the code via the provided structured output schema. Do NOT use markdown code blocks."
     ),
     (
         "user", 
@@ -44,7 +44,7 @@ ADVERSARY_CODER_PROMPT = ChatPromptTemplate.from_messages([
         "deserialization routines). Exploit known weaknesses typical for those operations.\n\n"
         "4. ASSERTION STRATEGY: Write explicit `assert` statements to capture silent data corruption, memory leaks, "
         "improper error handling, or state leakage.\n\n"
-        "5. FORMATTING: Output ONLY the raw test script code inside a markdown code block."
+        "5. FORMATTING: Return the code via the provided structured output schema. Do NOT use markdown code blocks."
     ),
     (
         "user", 

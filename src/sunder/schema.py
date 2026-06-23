@@ -2,7 +2,9 @@ from typing import List, Dict, Optional
 from pydantic import BaseModel, Field, SecretStr
 from enum import Enum
 
-# Knowledge Layer schema
+# =================================
+# Knowledge Layer schemas
+# =================================
 
 class NodeType(str, Enum):
     FUNCTION = "function"
@@ -39,7 +41,9 @@ class CodeNode(BaseModel):
         description="The programming language of this code chunk (e.g., 'python', 'javascript', 'go')."
     )
 
-# Execution Layer schema
+# =================================
+# Execution Layer schemas
+# =================================
 
 class NetworkMode(str, Enum):
     NONE = "none"
@@ -96,7 +100,9 @@ class ExecutionReport(BaseModel):
         description="True if the execution hit the timeout_seconds limit and was killed by the host."
     )
 
-# Orchestration Layer schema
+# =================================
+# Orchestration Layer schemas
+# =================================
 
 class AgentMode(str, Enum):
     BASELINE = "baseline"
@@ -200,9 +206,60 @@ class SunderAgentState(BaseModel):
         description="Captures host-level errors (e.g., Docker daemon unreachable, AST parsing failure) to safely abort the graph."
     )
 
-# --- Constants ---
+# ==========================================
+# Orchestration LLM Output Schemas
+# ==========================================
 
-# Map file extensions to Tree-sitter language identifiers
+class CoderOutput(BaseModel):
+    """Strict output schema for the Baseline and Adversarial Coder nodes."""
+    test_script: str = Field(
+        description=(
+            "The complete, fully executable test script code. "
+            "Do NOT include markdown formatting (like ```python). "
+            "Output strictly the raw source code."
+        )
+    )
+
+class BaselineEvaluatorOutput(BaseModel):
+    """Strict output schema for the Baseline Evaluator."""
+    verdict: EvaluationVerdict = Field(
+        description="The formal conclusion of the baseline execution."
+    )
+    feedback: str = Field(
+        default="",
+        description=(
+            "If SYNTAX_ERROR, explain how to fix the test script. "
+            "If VULNERABILITY_FOUND, explain the application crash. "
+            "Leave empty if SYSTEM_SECURE."
+        )
+    )
+    extracted_auth_headers: Dict[str, str] = Field(
+        default_factory=dict,
+        description="If SYSTEM_SECURE, extract printed JWTs or Bearer tokens here. Otherwise, empty."
+    )
+    extracted_seeded_entities: Dict[str, str] = Field(
+        default_factory=dict,
+        description="If SYSTEM_SECURE, extract printed mock database IDs here. Otherwise, empty."
+    )
+
+class AdversaryEvaluatorOutput(BaseModel):
+    """Strict output schema for the Adversary Evaluator."""
+    verdict: EvaluationVerdict = Field(
+        description="The formal conclusion of the adversarial execution."
+    )
+    feedback: str = Field(
+        default="",
+        description=(
+            "If SYNTAX_ERROR, explain how to fix the code. "
+            "If SYSTEM_SECURE, suggest a brief new attack vector for the next payload. "
+            "Leave empty if VULNERABILITY_FOUND."
+        )
+    )
+
+# =================================
+# Constants
+# =================================
+
 # Map file extensions to Tree-sitter language identifiers (Aligned with Helix Queries)
 EXTENSION_TO_LANGUAGE = {
     # Core languages
@@ -294,7 +351,6 @@ SKIP_FOLDERS = {
     "dist-newstyle"
 }
 
-# A map to resolve Tree-sitter language IDs to file extensions
 # A map to resolve Tree-sitter language IDs to conventional test file extensions
 LANGUAGE_EXTENSION_MAP = {
     # Core languages
