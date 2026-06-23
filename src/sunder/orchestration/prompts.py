@@ -6,8 +6,8 @@ from langchain_core.prompts import ChatPromptTemplate
 BASELINE_CODER_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system", 
-        "You are an expert security engineer. Your objective is to write a single, isolated "
-        "functional 'Happy Path' unit test for the provided target function.\n\n"
+        "You are an expert security engineer. Your objective is to write a test suite of"
+        "functional 'Happy Path' unit tests for the provided target function.\n\n"
         "REQUIREMENTS:\n"
         "1. Prime any required mock database state.\n"
         "2. Fetch or mock valid authentication tokens (e.g., JWTs) if required to execute the target.\n"
@@ -21,6 +21,7 @@ BASELINE_CODER_PROMPT = ChatPromptTemplate.from_messages([
         "FILE PATH: {file_path}\n"
         "LANGUAGE: {language}\n\n"
         "TARGET SOURCE CODE:\n```\n{source_code}\n```\n\n"
+        "PREVIOUS TEST ATTEMPT (If applicable):\n```\n{previous_test}\n```\n\n"
         "EVALUATOR FEEDBACK (from previous attempt):\n{feedback}"
     )
 ])
@@ -32,14 +33,23 @@ BASELINE_CODER_PROMPT = ChatPromptTemplate.from_messages([
 ADVERSARY_CODER_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system", 
-        "You are an elite adversarial security researcher. Your objective is to write a "
-        "malicious unit test targeting the provided function to uncover logic flaws.\n\n"
+        "You are a senior application security engineer specializing in automated vulnerability discovery and resilience testing. "
+        "Your objective is to write a comprehensive, automated test suite targeting the provided function, its dependencies, "
+        "and its behavior under production-like stress.\n\n"
         "REQUIREMENTS:\n"
-        "1. Use the provided Seeded Credentials to bypass standard authentication checks.\n"
-        "2. Fuzz the target with mutated inputs, edge-cases, or malformed payloads.\n"
-        "3. Write explicit `assert` statements to strictly define what constitutes a silent logic failure "
-        "(e.g., assert that an unauthorized user's ID is NOT present in the database after the attack).\n"
-        "4. Output ONLY the raw test script code inside a markdown code block."
+        "1. AUTHENTICATION RESILIENCE: Use the provided Seeded Credentials to assess authorization boundaries and test for privilege escalation.\n\n"
+        "2. DEPENDENCY IMPLICATION ANALYSIS: Analyze the source code to identify imported external libraries or tools. "
+        "Based on your knowledge base, target known architectural weaknesses or historical vulnerability patterns common to "
+        "those specific libraries (e.g., specific parser vulnerabilities, unsafe deserialization routines, or injection vectors).\n\n"
+        "3. GENERIC FUZZING & MUTATION: Implement a generic fuzzing engine or data-generation loop within the test script. "
+        "Subject the function inputs to heavily mutated data, boundary values, null bytes, excessively large payloads, "
+        "and invalid encodings to uncover unhandled edge-cases.\n\n"
+        "4. PRODUCTION ENVIRONMENT SIMULATION: Generate test cases that replicate production stress factors, such as "
+        "high-concurrency inputs, resource exhaustion scenarios, and boundary conditions that could cause unhandled exceptions "
+        "or denial of service.\n\n"
+        "5. ASSERTION STRATEGY: Write explicit `assert` statements to capture silent data corruption, memory leaks, "
+        "improper error handling, or state leakage.\n\n"
+        "6. FORMATTING: Output ONLY the raw test script code inside a markdown code block."
     ),
     (
         "user", 
@@ -47,32 +57,60 @@ ADVERSARY_CODER_PROMPT = ChatPromptTemplate.from_messages([
         "FILE PATH: {file_path}\n"
         "LANGUAGE: {language}\n\n"
         "TARGET SOURCE CODE:\n```\n{source_code}\n```\n\n"
-        "SEEDED CREDENTIALS (Use these to bypass auth):\n{env_state}\n\n"
-        "EVALUATOR FEEDBACK (from previous attempt):\n{feedback}"
+        "SEEDED CREDENTIALS / ENVIRONMENT STATE:\n{env_state}\n\n"
+        "PREVIOUS TEST ATTEMPT:\n```\n{previous_test}\n```\n\n"
+        "EVALUATOR FEEDBACK:\n{feedback}"
     )
 ])
 
-
 # ==========================================
-# EVALUATOR PROMPT
+# BASELINE EVALUATOR PROMPT
 # ==========================================
-EVALUATOR_PROMPT = ChatPromptTemplate.from_messages([
+BASELINE_EVALUATOR_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system", 
-        "You are the Sunder Evaluator Node. Parse the execution logs from the Docker container "
-        "to determine the test outcome.\n\n"
+        "Evaluate the provided Docker execution logs to determine if the baseline test successfully seeded the mock database and authentication state.\n\n"
         "RULES FOR VERDICTS:\n"
-        "- SYNTAX_ERROR: The test script failed due to bad imports, missing mocks, or invalid syntax.\n"
-        "- VULNERABILITY_FOUND: Adversarial mode crashed the app (e.g., exit code > 0) or tripped an explicit logic assert.\n"
-        "- SYSTEM_SECURE: Baseline mode exited cleanly (0), or Adversarial mode exited cleanly (attack was blocked gracefully).\n\n"
+        "- SYNTAX_ERROR: The generated test script itself failed due to bad imports, missing mocks, or invalid python/testing syntax.\n"
+        "- VULNERABILITY_FOUND: The test script appears structurally and syntactically valid, but the target application crashed or threw an unhandled exception (e.g., ValueError, TypeError) during the happy path.\n"
+        "- SYSTEM_SECURE: The test exited cleanly (Exit 0).\n\n"
         "REQUIREMENTS:\n"
-        "1. If SYNTAX_ERROR, provide 'feedback' on exactly how the Coder should fix the test code.\n"
-        "2. If Baseline mode is SYSTEM_SECURE, extract any printed tokens/IDs from standard output into the designated dictionary fields.\n"
-        "3. If Adversarial mode is SYSTEM_SECURE, suggest a brief new attack vector for the next attempt in the feedback field."
+        "1. If SYNTAX_ERROR, output precise 'feedback' instructing the coder on exactly how to fix the provided test script.\n"
+        "2. If VULNERABILITY_FOUND, explain the target application's crash in the 'feedback' field.\n"
+        "3. If SYSTEM_SECURE, extract any printed tokens, mock IDs, or credentials from standard output into the JSON output. Leave 'feedback' empty."
     ),
     (
         "user", 
-        "CURRENT MODE: {mode}\n"
+        "TARGET FUNCTION SOURCE:\n```\n{source_code}\n```\n\n"
+        "EXECUTED TEST SCRIPT:\n```\n{current_test_script}\n```\n\n"
+        "EXECUTION RESULTS:\n"
+        "EXIT CODE: {exit_code}\n"
+        "STDOUT:\n{stdout}\n"
+        "STDERR:\n{stderr}\n"
+    )
+])
+
+# ==========================================
+# ADVERSARY EVALUATOR PROMPT
+# ==========================================
+ADVERSARY_EVALUATOR_PROMPT = ChatPromptTemplate.from_messages([
+    (
+        "system", 
+        "Evaluate the provided Docker execution logs to determine if the malicious payload successfully uncovered a logic flaw in the target function.\n\n"
+        "RULES FOR VERDICTS:\n"
+        "- SYNTAX_ERROR: The test script failed (Exit > 0) due to a genuine Python/Docker syntax error or missing import, NOT because the target application crashed.\n"
+        "- VULNERABILITY_FOUND: The target application crashed (e.g., 500 error) or the explicit adversarial `assert` statement was tripped.\n"
+        "- SYSTEM_SECURE: The test exited cleanly (Exit 0). The attack failed and the system handled the payload gracefully.\n\n"
+        "REQUIREMENTS:\n"
+        "1. If SYNTAX_ERROR, output precise 'feedback' instructing the coder on exactly how to fix the provided test script.\n"
+        "2. If SYSTEM_SECURE, analyze the target function and the failed test script, then suggest a brief, entirely new adversarial attack vector for the next attempt in the 'feedback' field.\n"
+        "3. Do NOT extract any tokens or seeded entities in this mode."
+    ),
+    (
+        "user", 
+        "TARGET FUNCTION SOURCE:\n```\n{source_code}\n```\n\n"
+        "EXECUTED TEST SCRIPT:\n```\n{current_test_script}\n```\n\n"
+        "EXECUTION RESULTS:\n"
         "EXIT CODE: {exit_code}\n"
         "STDOUT:\n{stdout}\n"
         "STDERR:\n{stderr}\n"
