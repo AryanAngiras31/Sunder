@@ -6,7 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 BASELINE_CODER_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system", 
-        "You are an expert security engineer. Your objective is to write a test suite of"
+        "You are an expert security engineer. Your objective is to write a test suite of "
         "functional 'Happy Path' unit tests for the provided target function.\n\n"
         "REQUIREMENTS:\n"
         "1. Prime any required mock database state.\n"

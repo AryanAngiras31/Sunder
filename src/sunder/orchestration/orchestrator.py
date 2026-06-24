@@ -115,8 +115,12 @@ class SunderOrchestrator:
         if eval_result.verdict == EvaluationVerdict.VULNERABILITY_FOUND:
             new_status = AgentStatus.COMPLETED
         else:
-            if state.mode.value == "baseline" and  eval_result.verdict == EvaluationVerdict.SYSTEM_SECURE:
+            if state.mode == AgentMode.BASELINE and eval_result.verdict == EvaluationVerdict.SYSTEM_SECURE:
                 new_status = AgentStatus.COMPLETED
+
+        # Determine if the coding agent exhausted retries without success
+        if new_status == AgentStatus.PENDING and state.retry_count + 1 >= state.max_retries:
+            new_status = AgentStatus.FAILED
 
         updates = {
             "evaluator_feedback": eval_result.feedback,
