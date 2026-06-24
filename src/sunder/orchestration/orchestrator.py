@@ -54,7 +54,19 @@ class SunderOrchestrator:
 
     async def adversary_coder_node(self, state: SunderAgentState) -> dict:
         target = state.context.target_node
+
+        # Explicitly unmask secrets for the LLM prompt
         env = state.env_state
+        exposed_env_dict = {}
+        if env:
+            exposed_env_dict = {
+                "auth_headers": {k: v.get_secret_value() for k, v in env.auth_headers.items()},
+                "cookies": {k: v.get_secret_value() for k, v in env.cookies.items()},
+                "mock_credentials": {k: v.get_secret_value() for k, v in env.mock_credentials.items()},
+                "seeded_entities": env.seeded_entities,
+                "dynamic_endpoints": env.dynamic_endpoints,
+                "ephemeral_files": env.ephemeral_files
+            }
 
         structured_llm = self.coder_llm.with_structured_output(CoderOutput)
         chain = ADVERSARY_CODER_PROMPT | structured_llm
@@ -64,7 +76,7 @@ class SunderOrchestrator:
             "file_path": target.file_path,
             "language": target.language,
             "source_code": target.source_code,
-            "env_state": env.model_dump_json(indent=2) if env else "None available.",
+            "env_state": json.dumps(exposed_env_dict, indent=2) if exposed_env_dict else "None available.",
             "previous_test": state.current_test_script if state.retry_count > 0 else "None. This is the first attempt.",
             "feedback": state.evaluator_feedback if state.retry_count > 0 else "None. This is the first attack vector attempt."
         })
