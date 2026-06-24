@@ -31,6 +31,7 @@ class SunderOrchestrator:
         self.evaluator_llm = evaluator_llm
         self.target_path = target_path
         self.image_tag = image_tag
+        self.sandbox_executor = SandboxExecutor()
 
     # ==========================================
     # NODES
@@ -87,10 +88,8 @@ class SunderOrchestrator:
 
 
     def executor_node(self, state: SunderAgentState) -> dict:
-        executor = SandboxExecutor()
-
         # Run the latest test script in the sandbox
-        report = executor.run_test(
+        report = self.sandbox_executor.run_test(
             target_path=self.target_path,
             image_tag=self.image_tag,
             test_script=state.current_test_script,
@@ -144,7 +143,8 @@ class SunderOrchestrator:
         
         # Safely extract secrets if Baseline passed
         if state.mode == AgentMode.BASELINE and eval_result.verdict == EvaluationVerdict.SYSTEM_SECURE:
-            current_env = state.env_state
+            # Create a detached clone of the EnvironmentState
+            current_env = state.env_state.model_copy(deep=True)
             
             # Wrap sensitive strings in SecretStr before updating the environment
             secure_auth = {k: SecretStr(v) for k, v in eval_result.extracted_auth_headers.items()}
