@@ -132,7 +132,7 @@ class SunderOrchestrator:
                 new_status = AgentStatus.COMPLETED
 
         # Determine if the coding agent exhausted retries without success
-        if new_status == AgentStatus.PENDING and state.retry_count + 1 >= state.max_retries:
+        if new_status == AgentStatus.PENDING and state.retry_count >= state.max_retries:
             new_status = AgentStatus.FAILED
 
         updates = {
