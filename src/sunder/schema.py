@@ -241,6 +241,22 @@ class BaselineEvaluatorOutput(BaseModel):
         default_factory=dict,
         description="If SYSTEM_SECURE, extract printed mock database IDs here. Otherwise, empty."
     )
+    extracted_cookies: Dict[str, str] = Field(
+        default_factory=dict,
+        description="If SYSTEM_SECURE, extract printed session cookies here. Otherwise, empty."
+    )
+    extracted_mock_credentials: Dict[str, str] = Field(
+        default_factory=dict,
+        description="If SYSTEM_SECURE, extract printed mock username/passwords here. Otherwise, empty."
+    )
+    extracted_dynamic_endpoints: Dict[str, str] = Field(
+        default_factory=dict,
+        description="If SYSTEM_SECURE, extract printed dynamic host/port mappings here. Otherwise, empty."
+    )
+    extracted_ephemeral_files: List[str] = Field(
+        default_factory=list,
+        description="If SYSTEM_SECURE, extract printed paths to generated temporary files here. Otherwise, empty."
+    )
 
 class AdversaryEvaluatorOutput(BaseModel):
     """Strict output schema for the Adversary Evaluator."""

@@ -1,5 +1,7 @@
 from langgraph.graph import StateGraph, END
-from langchain_core.runnables import RunnableConfig
+
+import json
+from pydantic import SecretStr
 
 from sunder.schema import (
     SunderAgentState, 
@@ -143,8 +145,22 @@ class SunderOrchestrator:
         # Safely extract secrets if Baseline passed
         if state.mode == AgentMode.BASELINE and eval_result.verdict == EvaluationVerdict.SYSTEM_SECURE:
             current_env = state.env_state
-            current_env.auth_headers.update(eval_result.extracted_auth_headers)
+            
+            # Wrap sensitive strings in SecretStr before updating the environment
+            secure_auth = {k: SecretStr(v) for k, v in eval_result.extracted_auth_headers.items()}
+            current_env.auth_headers.update(secure_auth)
+            
+            secure_cookies = {k: SecretStr(v) for k, v in eval_result.extracted_cookies.items()}
+            current_env.cookies.update(secure_cookies)
+            
+            secure_creds = {k: SecretStr(v) for k, v in eval_result.extracted_mock_credentials.items()}
+            current_env.mock_credentials.update(secure_creds)
+            
+            # Merge standard strings and lists
             current_env.seeded_entities.update(eval_result.extracted_seeded_entities)
+            current_env.dynamic_endpoints.update(eval_result.extracted_dynamic_endpoints)
+            current_env.ephemeral_files.extend(eval_result.extracted_ephemeral_files)
+            
             updates["env_state"] = current_env
 
         return updates
