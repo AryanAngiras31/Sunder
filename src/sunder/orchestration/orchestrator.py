@@ -1,3 +1,4 @@
+import logging
 from langgraph.graph import StateGraph, END
 
 import json
@@ -20,6 +21,9 @@ from sunder.orchestration.prompts import (
 )
 from sunder.execution.sandbox import SandboxExecutor
 
+# Initialize standard Python logger
+logger = logging.getLogger(__name__)
+
 
 class SunderOrchestrator:
     """
@@ -32,6 +36,8 @@ class SunderOrchestrator:
         self.target_path = target_path
         self.image_tag = image_tag
         self.sandbox_executor = SandboxExecutor()
+        
+        logger.info(f"Initialized SunderOrchestrator for target '{target_path}' with image '{image_tag}'")
 
     # ==========================================
     # NODES
@@ -39,6 +45,7 @@ class SunderOrchestrator:
 
     async def baseline_coder_node(self, state: SunderAgentState) -> dict:
         target = state.context.target_node
+        logger.debug(f"Executing baseline_coder_node for '{target.symbol_name}' (Attempt {state.retry_count + 1}/{state.max_retries})")
         
         structured_llm = self.coder_llm.with_structured_output(CoderOutput)
         chain = BASELINE_CODER_PROMPT | structured_llm
@@ -57,6 +64,7 @@ class SunderOrchestrator:
 
     async def adversary_coder_node(self, state: SunderAgentState) -> dict:
         target = state.context.target_node
+        logger.debug(f"Executing adversary_coder_node for '{target.symbol_name}' (Attempt {state.retry_count + 1}/{state.max_retries})")
 
         # Explicitly unmask secrets for the LLM prompt
         env = state.env_state
@@ -88,6 +96,8 @@ class SunderOrchestrator:
 
 
     def executor_node(self, state: SunderAgentState) -> dict:
+        logger.debug("Starting Sandbox execution...")
+        
         # Run the latest test script in the sandbox
         report = self.sandbox_executor.run_test(
             target_path=self.target_path,
@@ -105,6 +115,7 @@ class SunderOrchestrator:
 
     async def evaluator_node(self, state: SunderAgentState) -> dict:
         report = state.execution_report
+        logger.debug(f"Executing evaluator_node in {state.mode.value.upper()} mode...")
         
         # Dynamically select Prompt and Strict Schema based on Mode
         if state.mode == AgentMode.BASELINE:
@@ -123,6 +134,8 @@ class SunderOrchestrator:
             "stderr": report.stderr
         })
         
+        logger.info(f"Evaluator Verdict: {eval_result.verdict.value}")
+
         # Determine overarching agent status based on the verdict
         new_status = AgentStatus.PENDING
         if eval_result.verdict == EvaluationVerdict.VULNERABILITY_FOUND:
@@ -133,6 +146,7 @@ class SunderOrchestrator:
 
         # Determine if the coding agent exhausted retries without success
         if new_status == AgentStatus.PENDING and state.retry_count >= state.max_retries:
+            logger.error(f"Agent exhausted max retries ({state.max_retries}) without success. Marking status as FAILED.")
             new_status = AgentStatus.FAILED
 
         updates = {
@@ -143,6 +157,8 @@ class SunderOrchestrator:
         
         # Safely extract secrets if Baseline passed
         if state.mode == AgentMode.BASELINE and eval_result.verdict == EvaluationVerdict.SYSTEM_SECURE:
+            logger.info("Baseline success. Extracting EnvironmentState secrets...")
+            
             # Create a detached clone of the EnvironmentState
             current_env = state.env_state.model_copy(deep=True)
             
@@ -178,6 +194,7 @@ class SunderOrchestrator:
     def route_evaluation(self, state: SunderAgentState) -> str:
         # Check timeout limit dynamically from state
         if state.retry_count >= state.max_retries:
+            logger.warning(f"Max retries ({state.max_retries}) reached. Forcing termination of LangGraph loop.")
             return END
             
         verdict = state.final_verdict
@@ -185,17 +202,21 @@ class SunderOrchestrator:
         
         # Always fix syntax error in the test
         if verdict == EvaluationVerdict.SYNTAX_ERROR:
+            logger.debug(f"Routing to {'baseline_coder' if mode == AgentMode.BASELINE else 'adversary_coder'} to fix SYNTAX_ERROR.")
             return "baseline_coder" if mode == AgentMode.BASELINE else "adversary_coder"
             
         # Always end when a vulnerability is found regardless of the mode
         if verdict == EvaluationVerdict.VULNERABILITY_FOUND:
+            logger.info("Routing to END (VULNERABILITY_FOUND).")
             return END
         
         # If system is secure and mode is baseline then success
         if verdict == EvaluationVerdict.SYSTEM_SECURE:
             if mode == AgentMode.BASELINE:
+                logger.info("Routing to END (BASELINE setup complete).")
                 return END
             else:
+                logger.debug("Routing to adversary_coder (Attack failed, attempting new payload).")
                 return "adversary_coder"
 
 
@@ -204,6 +225,7 @@ class SunderOrchestrator:
     # ==========================================
 
     def build_graph(self):
+        logger.debug("Compiling SunderOrchestrator LangGraph state machine...")
         workflow = StateGraph(SunderAgentState)
         
         # Add methods as nodes

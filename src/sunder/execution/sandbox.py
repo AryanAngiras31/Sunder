@@ -1,9 +1,13 @@
 import os
 import time
 import tempfile
+import logging
 import docker
 from docker.errors import APIError
 from sunder.schema import SandboxProfile, ExecutionReport, LANGUAGE_EXTENSION_MAP
+
+# Initialize standard Python logger
+logger = logging.getLogger(__name__)
 
 class SandboxExecutor:
     def __init__(self):
@@ -23,6 +27,8 @@ class SandboxExecutor:
         # Resolve the correct test file suffix
         file_suffix = LANGUAGE_EXTENSION_MAP.get(language.lower(), ".txt")
         file_name = f"sunder_generated_test{file_suffix}"
+        
+        logger.debug(f"Preparing sandbox execution for {language} target...")
 
         # Create a temporary directory on the host to hold the volatile test script
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -54,6 +60,7 @@ class SandboxExecutor:
             env_vars["PYTHONDONTWRITEBYTECODE"] = "1"
             
             try:
+                logger.debug(f"Starting container with image {image_tag}")
                 # Start the container in detached mode so we can manually enforce timeouts
                 container = self.client.containers.run(
                     image=image_tag,
@@ -69,6 +76,7 @@ class SandboxExecutor:
                 # Polling loop to enforce the timeout_seconds constraint
                 while container.status in ['created', 'running']:
                     if time.time() - start_time > sandbox_profile.timeout_seconds:
+                        logger.warning(f"Sandbox execution timed out after {sandbox_profile.timeout_seconds}s. Killing container.")
                         container.kill()
                         timed_out = True
                         break
@@ -89,6 +97,12 @@ class SandboxExecutor:
                 
                 duration = round(time.time() - start_time, 2)
 
+                # Log sandbox metrics using local variables
+                if oom_killed:
+                    logger.warning("Sandbox execution was OOM killed")
+                elif not timed_out:
+                    logger.debug(f"Sandbox execution completed cleanly with exit code {exit_code} in {duration}s")
+
                 return ExecutionReport(
                     exit_code=exit_code,
                     stdout=stdout,
@@ -99,6 +113,7 @@ class SandboxExecutor:
                 )
 
             except APIError as e:
+                logger.error(f"Host-Level Docker API Error: {str(e)}")
                 return ExecutionReport(
                     exit_code=-1,
                     stdout="",
@@ -113,5 +128,5 @@ class SandboxExecutor:
                 if container:
                     try:
                         container.remove(force=True)
-                    except APIError:
-                        pass
+                    except APIError as e:
+                        logger.debug(f"Failed to silently remove container {container.id}: {e}")
