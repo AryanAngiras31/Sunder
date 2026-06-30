@@ -2,6 +2,7 @@ import os
 import time
 import tempfile
 import logging
+import requests
 import docker
 from docker.types import Mount
 from docker.errors import APIError
@@ -83,19 +84,26 @@ class SandboxExecutor:
                     detach=True
                 )
 
-                # Polling loop to enforce the timeout_seconds constraint
-                while container.status in ['created', 'running']:
-                    if time.time() - start_time > sandbox_profile.timeout_seconds:
-                        logger.warning(f"Sandbox execution timed out after {sandbox_profile.timeout_seconds}s. Killing container.")
-                        container.kill()
-                        timed_out = True
-                        break
-                    time.sleep(0.5)
-                    container.reload() # Refresh container status from daemon
+                # Get results from the run while enforcing the timeout
+                try:
+                    result = container.wait(timeout=sandbox_profile.timeout_seconds)
+                    exit_code = result.get('StatusCode', 1) 
 
-                # Wait for container to finalize and extract the exit code
-                result = container.wait()
-                exit_code = result.get('StatusCode', 137 if timed_out else 1)
+                except (requests.exceptions.ReadTimeout, results.exceptions.ConnectionError) as e:
+                    # When a socket connection to a container is closed, docker does not know if it was due to a timeout or another reason 
+                    # This is why it allows requests exceptions to bleed through.
+                    # We check the elapsed time to verify it was a true timeout and not a daemon crash.
+                    elapsed = time.time() - start_time
+                    if elapsed >= sandbox_profile.timeout_seconds - 1:  # Use a 1 second buffer to take into accound premature timeout 
+                        logger.warning(f"Sandbox execution timed out after {sandbox_profile.timeout_seconds}s. Killing container.")
+                        try:
+                            container.kill()
+                        except APIError:
+                            pass # Container might have already died 
+                        timed_out = True
+                        exit_code = 137
+                    else:
+                        raise APIError(f"Connection to Docker daemon dropped unexpectedly: {e}")
 
                 # Extract telemetry
                 stdout = container.logs(stdout=True, stderr=False).decode('utf-8', errors='replace')
