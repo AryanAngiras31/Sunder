@@ -25,8 +25,6 @@ def dummy_target_repo(tmp_path):
     # A lightweight Alpine Python image for fast testing
     dockerfile.write_text(
         "FROM python:3.11-alpine\n"
-        "WORKDIR /app\n"
-        "CMD [\"python\", \"/sunder_test/sunder_generated_test.py\"]\n"
     )
     
     return str(target_dir)

@@ -3,8 +3,9 @@ import time
 import tempfile
 import logging
 import docker
+from docker.types import Mount
 from docker.errors import APIError
-from sunder.schema import SandboxProfile, ExecutionReport, LANGUAGE_EXTENSION_MAP
+from sunder.schema import SandboxProfile, ExecutionReport, LANGUAGE_EXTENSION_MAP, LANGUAGE_RUN_COMMANDS
 
 # Initialize standard Python logger
 logger = logging.getLogger(__name__)
@@ -37,39 +38,48 @@ class SandboxExecutor:
                 f.write(test_script)
 
             # Define strict volume mounts
-            volumes = {
-                # Mount the enterprise codebase as purely read-only
-                os.path.abspath(target_path): {
-                    'bind': '/app', 
-                    'mode': 'ro'
-                },
-                # Mount the temporary test script directory
-                os.path.abspath(temp_dir): {
-                    'bind': '/sunder_test', 
-                    'mode': 'rw'
-                }
-            }
+            mounts = [
+                Mount(
+                    target='/ro_app',
+                    source=os.path.abspath(target_path),
+                    type='bind',
+                    read_only=True
+                ),
+                Mount(
+                    target='/sunder_test',
+                    source=os.path.abspath(temp_dir),
+                    type='bind',
+                    read_only=True
+                )
+            ]
+
+            # Fetch the execution command for the target language
+            run_cmd = LANGUAGE_RUN_COMMANDS.get(language.lower(), f"cat {file_name}")
+
+            # Copy both the codebase and Sunder test directories into app/
+            shell_command = (
+                f"sh -c '"
+                f"cp -a /ro_app/. /app/ && "
+                f"cp /sunder_test/{file_name} /app/ && "
+                f"{run_cmd}'"
+            )
 
             start_time = time.time()
             container = None
             timed_out = False
 
-            # Inject env variables to allow the tests to import code from the ro user code
-            env_vars = sandbox_profile.environment_vars.copy()
-            env_vars["PYTHONPATH"] = "/app"
-            env_vars["PYTHONDONTWRITEBYTECODE"] = "1"
-            
             try:
                 logger.debug(f"Starting container with image {image_tag}")
                 # Start the container in detached mode so we can manually enforce timeouts
                 container = self.client.containers.run(
                     image=image_tag,
-                    volumes=volumes,
+                    mounts=mounts,
                     working_dir="/app",
+                    command=shell_command,
                     network_mode=sandbox_profile.network_mode.value,
                     mem_limit=sandbox_profile.memory_limit,
                     cpu_quota=int(sandbox_profile.cpu_quota * 100000),   # Convert fractional CPU to Docker's cpu_quota (100000 = 1 core)
-                    environment=env_vars,
+                    environment=sandbox_profile.environment_vars,
                     detach=True
                 )
 

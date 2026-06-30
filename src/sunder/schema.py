@@ -402,3 +402,38 @@ LANGUAGE_EXTENSION_MAP = {
     # Infrastructure & Systems
     "bash": ".bats",              # Bash Automated Testing System (Aligned with Helix)
 }
+
+# Commands used to execute the AI-generated test script after the ephemeral workspace is staged
+LANGUAGE_RUN_COMMANDS = {
+    # Core languages
+    "python": "python sunder_generated_test.py",
+    "javascript": "node sunder_generated_test.test.js",
+    "typescript": "npx ts-node sunder_generated_test.test.ts",
+    "go": "go test sunder_generated_test_test.go",
+    "java": "java sunder_generated_testTest.java",  # Relies on Java 11+ single-file source execution
+    "rust": "rustc sunder_generated_test.rs && ./sunder_generated_test",
+    "c": "gcc sunder_generated_test.c -o test_bin && ./test_bin",
+    "cpp": "g++ sunder_generated_test.cpp -o test_bin && ./test_bin",
+    "c-sharp": "csc sunder_generated_testTests.cs && mono sunder_generated_testTests.exe", 
+    "ruby": "ruby sunder_generated_test_spec.rb",
+
+    # Enterprise & Mobile
+    "kotlin": "kotlinc sunder_generated_testTest.kt -include-runtime -d test.jar && java -jar test.jar",
+    "swift": "swift sunder_generated_testTests.swift",
+    
+    # Web & Scripting
+    "php": "php sunder_generated_testTest.php",
+    "dart": "dart test sunder_generated_test_test.dart",
+    "perl": "perl sunder_generated_test.t",
+    "lua": "lua sunder_generated_test_spec.lua",
+    "r": "Rscript sunder_generated_testtest.R",
+
+    # Functional & Concurrency
+    "elixir": "elixir sunder_generated_test_test.exs",
+    "erlang": "erlc sunder_generated_test_SUITE.erl && erl -noshell -s sunder_generated_test_SUITE test -s init stop",
+    "haskell": "runhaskell sunder_generated_testSpec.hs",
+    "scala": "scala sunder_generated_testSpec.scala",
+
+    # Infrastructure & Systems
+    "bash": "bats sunder_generated_test.bats"
+}
