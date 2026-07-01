@@ -3,6 +3,7 @@ import time
 import tempfile
 import logging
 import requests
+import shlex
 import docker
 from docker.types import Mount
 from docker.errors import APIError
@@ -54,8 +55,31 @@ class SandboxExecutor:
                 )
             ]
 
-            # Format the SKIP_FOLDERS set into tar --exclude arguments
-            tar_excludes = " ".join([f"--exclude='{folder}'" for folder in SKIP_FOLDERS])
+            # Dynamically merge user-defined ignores with Sunder's hardcoded skips
+            dynamic_skips = set(SKIP_FOLDERS)
+            gitignore_path = os.path.join(target_path, ".gitignore")
+            
+            if os.path.exists(gitignore_path):
+                with open(gitignore_path, "r") as ig_file:
+                    for line in ig_file:
+                        line = line.strip()
+                        
+                        # Skip empty lines, comments, and negations 
+                        if not line or line.startswith("#") or line.startswith("!"):
+                            continue
+                        
+                        # Translate Root Anchors
+                        if line.startswith('/'):
+                            line = f".{line}"
+                            
+                        # 3. Strip Trailing Slashes
+                        line = line.rstrip('/')
+                        
+                        dynamic_skips.add(line)
+
+            # We use shlex.quote() to safely wrap the wildcard patterns (e.g. *.log, data/*).
+            # This prevents adversarial command injection if a bad actor poisons the .gitignore.
+            tar_excludes = " ".join([f"--exclude={shlex.quote(folder)}" for folder in dynamic_skips])
             
             # Fetch the execution command for the target language
             run_cmd = LANGUAGE_RUN_COMMANDS.get(language.lower(), f"cat {file_name}")

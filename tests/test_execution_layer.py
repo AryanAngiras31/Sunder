@@ -1,5 +1,6 @@
 import os
 import pytest
+from pathlib import Path
 from sunder.execution.bootstrapper import Bootstrapper
 from sunder.execution.sandbox import SandboxExecutor
 from sunder.schema import SandboxProfile, NetworkMode
@@ -145,3 +146,68 @@ def test_sandbox_syntax_error(dummy_target_repo, sandbox_profile):
     
     assert report.exit_code != 0
     assert "SyntaxError" in report.stderr
+
+def test_sandbox_gitignore_tar_pipe_exclusion(dummy_target_repo, sandbox_profile):
+    """
+    Tests that the Tar-Pipe correctly parses .gitignore, translates Git syntax 
+    to tar exclusions, and safely escapes shell injections.
+    """
+    target_path = Path(dummy_target_repo)
+    
+    # Setup the edge-case .gitignore
+    gitignore_path = target_path / ".gitignore"
+    gitignore_path.write_text(
+        "# This is a comment and should be ignored\n"
+        "heavy_dataset/\n"               # Tests trailing slash stripping
+        "/root_cache\n"                  # Tests root anchor translation
+        "*.log\n"                        # Tests wildcard evaluation
+        "!important.log\n"               # Tests negation skipping (unsupported by tar)
+        "malicious_dir'; rm -rf /; '\n"  # Tests shlex shell escaping
+    )
+    
+    # Generate the physical files and directories
+    (target_path / "heavy_dataset").mkdir()
+    (target_path / "heavy_dataset" / "data.bin").write_text("101010")
+    
+    (target_path / "root_cache").mkdir()
+    (target_path / "root_cache" / "cache.bin").write_text("101010")
+    
+    (target_path / "debug.log").write_text("crash trace")
+    (target_path / "valid_file.txt").write_text("keep me")
+
+    # Build image and run sandbox
+    bootstrapper = Bootstrapper()
+    image_tag = bootstrapper.ensure_environment(dummy_target_repo)
+    
+    sandbox = SandboxExecutor()
+    
+    # The AI test script will traverse the container's /app directory and dump all file names
+    test_script = (
+        "import os\n"
+        "found = set()\n"
+        "for root, dirs, files in os.walk('/app'):\n"
+        "    for name in dirs + files:\n"
+        "        found.add(name)\n"
+        "print(f'FOUND: {found}')\n"
+    )
+    
+    report = sandbox.run_test(
+        target_path=dummy_target_repo,
+        image_tag=image_tag,
+        test_script=test_script,
+        sandbox_profile=sandbox_profile,
+        language="python"
+    )
+    
+    # Assert Pipeline Integrity
+    assert report.exit_code == 0, f"Tar-Pipe crashed. Stderr: {report.stderr}"
+    stdout = report.stdout
+    
+    # Assert File Exclusions
+    assert "valid_file.txt" in stdout, "Tar-Pipe failed to copy valid host files."
+    assert "heavy_dataset" not in stdout, "Tar-Pipe failed to parse and exclude trailing-slash directories."
+    assert "root_cache" not in stdout, "Tar-Pipe failed to translate and exclude root-anchored directories."
+    assert "debug.log" not in stdout, "Tar-Pipe failed to evaluate glob wildcards."
+    
+    # If the shell injection payload had broken out of shlex.quote, the tar command would 
+    # have shattered, returning exit_code > 0 and skipping the Python script entire
