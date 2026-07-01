@@ -408,7 +408,7 @@ LANGUAGE_RUN_COMMANDS = {
     # Core languages
     "python": "python sunder_generated_test.py",
     "javascript": "node sunder_generated_test.test.js",
-    "typescript": "npx ts-node sunder_generated_test.test.ts",
+    "typescript": "npx -y tsx sunder_generated_test.test.ts",
     "go": "go test sunder_generated_test_test.go",
     "java": "java sunder_generated_testTest.java",  # Relies on Java 11+ single-file source execution
     "rust": "rustc sunder_generated_test.rs && ./sunder_generated_test",
