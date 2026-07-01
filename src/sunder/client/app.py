@@ -1,119 +1,166 @@
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical
-from textual.widgets import Header, Footer, Static, TabbedContent, TabPane, Placeholder
+from textual.containers import Container, Vertical, Grid
+from textual.widgets import (
+    Header,
+    Footer,
+    Input,
+    OptionList,
+    RadioSet,
+    RadioButton,
+    Switch,
+    TabbedContent,
+    TabPane,
+    RichLog,
+    Label,
+    Static,
+)
 
 class SunderApp(App):
-    """Sunder's primary LazyDocker-style TUI interface."""
+    """The main unified interface for the Sunder application."""
 
-    TITLE = "SUNDER"
-    SUB_TITLE = "Zero-Trust Agentic Fuzzer"
-
-    # Define the UI theme and grid layout using Textual CSS (TCSS)
+    # Using Textual CSS with custom variables for coloring and grid layouts
     CSS = """
-    /* --- CSS Variables for Theming --- */
-    $border-color: #5a5a5a;
-    $focus-border-color: #00ff00;
+    /* --- Color Variables --- */
     $panel-bg: #1e1e1e;
-    $text-primary: #e0e0e0;
-    $accent-color: #00ffff;
+    $border-idle: #444444;
+    $border-focus: #00ff00;
+    $text-muted: #888888;
+    $accent: #00bcd4;
 
-    /* --- Base Screen --- */
+    /* --- Global Layout --- */
     Screen {
-        background: #0b0b0b;
+        background: $background;
     }
 
-    /* --- Main Grid Layout --- */
-    #main-container {
+    #main-workspace {
         layout: grid;
         grid-size: 2 1; /* 2 columns, 1 row */
-        grid-columns: 3fr 7fr; /* 30% left sidebar, 70% right workspace */
+        grid-columns: 20% 80%; /* 20:80 sidebar to dashboard ratio */
         height: 100%;
         width: 100%;
     }
 
-    /* --- Left Column: Control Sidebar --- */
-    #sidebar-column {
-        layout: grid;
-        grid-size: 1 2; /* 1 column, 2 rows */
-        grid-rows: 6fr 4fr; /* Target explorer is slightly taller than Config */
-        height: 100%;
-    }
-
-    /* --- Universal Pane Styling --- */
+    /* --- Pane Styling --- */
     .pane {
-        border: round $border-color;
         background: $panel-bg;
-        color: $text-primary;
-        margin: 0 1 1 1;
+        border: round $border-idle;
         padding: 0 1;
+        margin: 0 1;
     }
 
-    /* Glowing effect when a pane (or a widget inside it) is focused */
     .pane:focus-within {
-        border: round $focus-border-color;
+        border: round $border-focus;
     }
-
+    
     .pane-title {
-        color: $accent-color;
+        color: $accent;
         text-style: bold;
         margin-bottom: 1;
-        content-align: center middle;
-        width: 100%;
     }
 
-    /* --- Right Column Workspace Specifics --- */
-    #workspace-column {
+    /* --- Sidebar: Target Explorer --- */
+    #target-explorer {
+        height: 15; /* Fixed small height for search bar and a few options */
+    }
+    
+    #target-explorer Input {
+        margin-bottom: 1;
+    }
+
+    /* --- Sidebar: Configuration --- */
+    #sandbox-config {
+        height: 1fr; /* Occupies the rest of the sidebar space */
+    }
+
+    .config-label {
+        color: $text-muted;
+        margin-top: 1;
+    }
+
+    /* --- Main Dashboard --- */
+    #dashboard {
+        height: 100%;
+    }
+
+    /* --- Telemetry Split View --- */
+    #telemetry-grid {
+        layout: grid;
+        grid-size: 2 1;
+        grid-columns: 1fr 1fr; /* 50/50 split for thoughts and logs */
+        height: 100%;
+    }
+
+    #telemetry-grid RichLog {
+        border: solid $border-idle;
         height: 100%;
     }
     
-    TabbedContent {
-        height: 100%;
+    #telemetry-grid RichLog:focus {
+        border: solid $border-focus;
     }
     """
 
-    # Global Hotkeys map directly to the Footer and trigger App-level events
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("tab", "app.focus_next", "Change Pane"),
-        ("s", "start_run", "Start Run"),
-        ("m", "toggle_mode", "Toggle Mode")
+        ("s", "start_run", "Start Test"),
+        ("tab", "focus_next", "Change Pane"),
     ]
 
     def compose(self) -> ComposeResult:
-        """Construct the UI hierarchy."""
-        
+        """Compose the user interface."""
         yield Header(show_clock=True)
         
-        with Container(id="main-container"):
+        with Container(id="main-workspace"):
             
-            # --- LEFT COLUMN: Control Sidebar ---
-            with Container(id="sidebar-column"):
+            # --- LEFT COLUMN (20%) ---
+            with Vertical(id="sidebar"):
                 
-                # Pane 1: Target Explorer
-                with Vertical(classes="pane", id="target-explorer"):
-                    yield Static("🎯 Target Explorer", classes="pane-title")
-                    yield Placeholder("Search Bar & AST Node List here")
+                # Target Explorer (Small footprint)
+                with Vertical(id="target-explorer", classes="pane"):
+                    yield Label("🎯 Target Explorer", classes="pane-title")
+                    yield Input(placeholder="Search function (e.g. verify_jwt)...")
+                    # Placeholder options to show layout footprint
+                    yield OptionList(
+                        "verify_jwt [FUNC]", 
+                        "AuthManager [CLASS]", 
+                        "validate_payload [FUNC]"
+                    )
                 
-                # Pane 2: Sandbox Config
-                with Vertical(classes="pane", id="sandbox-config"):
-                    yield Static("🛡️ Zero-Trust Config", classes="pane-title")
-                    yield Placeholder("Network / Host / Memory Toggles here")
-
-            # --- RIGHT COLUMN: Main Workspace ---
-            with Container(classes="pane", id="workspace-column"):
-                
-                with TabbedContent():
-                    # Tab 1: Live Telemetry (Split Grid)
-                    with TabPane("Live Telemetry", id="tab-telemetry"):
-                        yield Placeholder("Split View: LLM Output (Left) | Docker Logs (Right)")
+                # Zero-Trust Config (Occupies majority of the sidebar)
+                with Vertical(id="sandbox-config", classes="pane"):
+                    yield Label("⚙️  Sandbox Config", classes="pane-title")
                     
-                    # Tab 2: Code Context
+                    yield Label("Execution Mode", classes="config-label")
+                    with RadioSet():
+                        yield RadioButton("Baseline Mode", value=True)
+                        yield RadioButton("Adversarial Mode")
+                    
+                    yield Label("Network Access", classes="config-label")
+                    yield Switch(value=False) # Zero-trust default
+                    
+                    yield Label("Memory Limit", classes="config-label")
+                    yield Input(value="256m", placeholder="e.g. 512m")
+                    
+                    yield Label("CPU Quota", classes="config-label")
+                    yield Input(value="1.0", placeholder="e.g. 0.5")
+
+            # --- RIGHT COLUMN (80%) ---
+            with Vertical(id="dashboard", classes="pane"):
+                with TabbedContent(initial="tab-telemetry"):
+                    
+                    # Tab 1: Live Telemetry
+                    with TabPane("Live Telemetry", id="tab-telemetry"):
+                        with Grid(id="telemetry-grid"):
+                            yield RichLog(id="agent-workspace", highlight=True, markup=True)
+                            yield RichLog(id="docker-sandbox", highlight=True)
+                    
+                    # Tab 2: Code Context (Phase 1: Just Source)
                     with TabPane("Code Context", id="tab-context"):
-                        yield Placeholder("Read-Only Source Code Viewer")
+                        yield Static("Source code for selected target will render here...")
                     
                     # Tab 3: Execution Report
                     with TabPane("Execution Report", id="tab-report"):
-                        yield Placeholder("Verdict, JWTs, Mock IDs, and Stats")
+                        yield Static("Post-execution metrics and vulnerability verdicts will render here...")
 
         yield Footer()
 
