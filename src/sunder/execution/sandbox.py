@@ -72,7 +72,7 @@ class SandboxExecutor:
                         if line.startswith('/'):
                             line = f".{line}"
                             
-                        # 3. Strip Trailing Slashes
+                        # Strip Trailing Slashes
                         line = line.rstrip('/')
                         
                         dynamic_skips.add(line)
@@ -88,9 +88,9 @@ class SandboxExecutor:
             setup_prefix = f"{pre_req_setup} && " if pre_req_setup else ""
 
             # The UNIX Tar-Pipe
-            # 1. 'tar -c' creates a stream of /ro_app, skipping massive folders (node_modules, .git, etc.)
-            # 2. 'tar -x' instantly extracts physical files into the writable /app directory
-            # 3. Preserves container-native dependencies built via the Dockerfile
+            # 'tar -c' creates a stream of /ro_app, skipping massive folders (node_modules, .git, etc.)
+            # 'tar -x' instantly extracts physical files into the writable /app directory
+            # Preserves container-native dependencies built via the Dockerfile
             shell_command = (
                 f"sh -c '"
                 f"{setup_prefix}"
