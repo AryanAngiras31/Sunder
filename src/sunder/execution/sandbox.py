@@ -6,7 +6,7 @@ import requests
 import docker
 from docker.types import Mount
 from docker.errors import APIError
-from sunder.schema import SandboxProfile, ExecutionReport, LANGUAGE_EXTENSION_MAP, LANGUAGE_RUN_COMMANDS
+from sunder.schema import SandboxProfile, ExecutionReport, LANGUAGE_EXTENSION_MAP, LANGUAGE_RUN_COMMANDS, SKIP_FOLDERS
 
 # Initialize standard Python logger
 logger = logging.getLogger(__name__)
@@ -54,13 +54,23 @@ class SandboxExecutor:
                 )
             ]
 
+            # Format the SKIP_FOLDERS set into tar --exclude arguments
+            tar_excludes = " ".join([f"--exclude='{folder}'" for folder in SKIP_FOLDERS])
+            
             # Fetch the execution command for the target language
             run_cmd = LANGUAGE_RUN_COMMANDS.get(language.lower(), f"cat {file_name}")
+            
+            pre_req_setup = sandbox_profile.environment_vars.get("BEFORE_EXECUTION", "")
+            setup_prefix = f"{pre_req_setup} && " if pre_req_setup else ""
 
-            # Copy both the codebase and Sunder test directories into app/
+            # The UNIX Tar-Pipe
+            # 1. 'tar -c' creates a stream of /ro_app, skipping massive folders (node_modules, .git, etc.)
+            # 2. 'tar -x' instantly extracts physical files into the writable /app directory
+            # 3. Preserves container-native dependencies built via the Dockerfile
             shell_command = (
                 f"sh -c '"
-                f"cp -a /ro_app/. /app/ && "
+                f"{setup_prefix}"
+                f"tar -c -C /ro_app {tar_excludes} . | tar -x -C /app && "
                 f"cp /sunder_test/{file_name} /app/ && "
                 f"{run_cmd}'"
             )
@@ -89,7 +99,7 @@ class SandboxExecutor:
                     result = container.wait(timeout=sandbox_profile.timeout_seconds)
                     exit_code = result.get('StatusCode', 1) 
 
-                except (requests.exceptions.ReadTimeout, results.exceptions.ConnectionError) as e:
+                except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
                     # When a socket connection to a container is closed, docker does not know if it was due to a timeout or another reason 
                     # This is why it allows requests exceptions to bleed through.
                     # We check the elapsed time to verify it was a true timeout and not a daemon crash.
