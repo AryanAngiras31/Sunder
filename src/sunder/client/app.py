@@ -17,10 +17,13 @@ from textual.widgets import (
     Label
 )
 
-# Sunder Core Imports mapped directly to your codebase
+# Sunder Core Imports
 from sunder.execution.bootstrapper import Bootstrapper
 from sunder.knowledge.database import KnowledgeDatabase
 from sunder.knowledge.ingestion import IngestionEngine
+
+# Import our newly created HITL Search Pane
+from sunder.client.hitl_search import TargetExplorerPane
 
 class SunderApp(App):
     """Sunder's primary LazyDocker-style TUI interface."""
@@ -36,29 +39,23 @@ class SunderApp(App):
     $text-primary: #e0e0e0;
     $accent-color: #00ffff;
 
-    /* --- Base Screen --- */
-    Screen {
-        background: #0b0b0b;
-    }
+    Screen { background: #0b0b0b; }
 
-    /* --- Main Grid Layout --- */
     #main-container {
         layout: grid;
-        grid-size: 2 1; /* 2 columns, 1 row */
-        grid-columns: 3fr 7fr; /* 30% left sidebar, 70% right workspace */
+        grid-size: 2 1; 
+        grid-columns: 3fr 7fr; 
         height: 100%;
         width: 100%;
     }
 
-    /* --- Left Column: Control Sidebar --- */
     #sidebar-column {
         layout: grid;
-        grid-size: 1 2; /* 1 column, 2 rows */
-        grid-rows: 6fr 4fr; /* Target explorer is slightly taller than Config */
+        grid-size: 1 2; 
+        grid-rows: 6fr 4fr; 
         height: 100%;
     }
 
-    /* --- Universal Pane Styling --- */
     .pane {
         border: round $border-color;
         background: $panel-bg;
@@ -67,9 +64,7 @@ class SunderApp(App):
         padding: 0 1;
     }
 
-    .pane:focus-within {
-        border: round $focus-border-color;
-    }
+    .pane:focus-within { border: round $focus-border-color; }
 
     .pane-title {
         color: $accent-color;
@@ -79,11 +74,8 @@ class SunderApp(App):
         width: 100%;
     }
 
-    /* --- Sidebar Specifics --- */
     #target-explorer Input { margin-bottom: 1; }
     .config-label { margin-top: 1; color: #888888; }
-
-    /* --- Right Column Workspace Specifics --- */
     #workspace-column { height: 100%; }
     TabbedContent { height: 100%; }
     
@@ -94,14 +86,8 @@ class SunderApp(App):
         height: 100%;
     }
     
-    #telemetry-grid RichLog {
-        border: solid $border-color;
-        height: 100%;
-    }
-    
-    #telemetry-grid RichLog:focus {
-        border: solid $focus-border-color;
-    }
+    #telemetry-grid RichLog { border: solid $border-color; height: 100%; }
+    #telemetry-grid RichLog:focus { border: solid $focus-border-color; }
     """
 
     BINDINGS = [
@@ -113,9 +99,9 @@ class SunderApp(App):
 
     def __init__(self):
         super().__init__()
-        # State variables to hold Sunder components after boot
         self.image_tag = None
         self.knowledge_db = None
+        self.selected_target_id = None
 
     def on_mount(self) -> None:
         """Fires immediately when the UI is drawn to the terminal."""
@@ -131,28 +117,22 @@ class SunderApp(App):
             # 1. Execution Layer: Bootstrapper
             self.app.call_from_thread(self.notify, "Building .sunder/Dockerfile...", title="Bootstrapper")
             bootstrapper = Bootstrapper()
-            # This handles building the image and returns the tag
-            image_tag = bootstrapper.ensure_environment(target_dir) 
-            self.image_tag = image_tag # Save to instance for the Orchestrator later
+            self.image_tag = bootstrapper.ensure_environment(target_dir) 
 
             # 2. Knowledge Layer: AST Ingestion
             self.app.call_from_thread(self.notify, "Parsing AST into SQLite...", title="Ingestion Engine")
             db = KnowledgeDatabase()
             ingestion_engine = IngestionEngine(db)
-            # Parses the repo and populates FTS5
             ingestion_engine.ingest_repository(target_dir) 
-            self.knowledge_db = db # Save to instance for the Target Explorer later
+            self.knowledge_db = db 
 
-            # Initialization Success!
             self.app.call_from_thread(
                 self.notify, 
                 "Sunder is ready. Search for a target function to begin.", 
                 title="System Ready 🟢", 
                 severity="information"
             )
-
         except Exception as e:
-            # Catch FileNotFoundError (missing Dockerfile), BuildError, etc.
             error_message = f"Startup Failed: {str(e)}"
             
             self.app.call_from_thread(
@@ -169,9 +149,30 @@ class SunderApp(App):
         try:
             agent_log = self.query_one("#agent-workspace", RichLog)
             agent_log.write(f"[bold red]SYSTEM ERROR:[/bold red] {message}")
-            agent_log.write("Please check your terminal execution path, `.sunder/Dockerfile`, and Docker daemon.")
         except Exception:
             pass 
+
+    async def on_option_list_option_selected(self, message: OptionList.OptionSelected) -> None:
+        """Fires when the user hits 'Enter' on an AST search result."""
+        # Grab the node_id we tucked into the Option object
+        self.selected_target_id = message.option.id
+        
+        # Fetch the full CodeNode from the database
+        target_node = self.knowledge_db.get_node(self.selected_target_id)
+        
+        if target_node:
+            # Shift UI focus to the Dashboard and open the Code Context tab
+            tabs = self.query_one(TabbedContent)
+            tabs.active = "tab-context"
+            
+            # Print the source code to the context viewer
+            context_viewer = self.query_one("#context-viewer", Static)
+            
+            # Format nicely for the UI
+            header = f"[bold cyan]Selected Target:[/bold cyan] {target_node.symbol_name} ({target_node.file_path})\n\n"
+            context_viewer.update(header + target_node.source_code)
+            
+            self.notify(f"Target selected: {target_node.symbol_name}", title="Target Selected")
 
     def compose(self) -> ComposeResult:
         """Construct the UI hierarchy."""
@@ -182,10 +183,8 @@ class SunderApp(App):
             # --- LEFT COLUMN: Control Sidebar ---
             with Container(id="sidebar-column"):
                 
-                with Vertical(classes="pane", id="target-explorer"):
-                    yield Static("Target Explorer", classes="pane-title")
-                    yield Input(placeholder="Search function (e.g. verify_jwt)...", id="search-input")
-                    yield OptionList(id="target-results")
+                # INJECTED HITL SEARCH PANE
+                yield TargetExplorerPane(classes="pane", id="target-explorer")
                 
                 with Vertical(classes="pane", id="sandbox-config"):
                     yield Static("Zero-Trust Config", classes="pane-title")
@@ -203,16 +202,15 @@ class SunderApp(App):
 
             # --- RIGHT COLUMN: Main Workspace ---
             with Container(classes="pane", id="workspace-column"):
-                
-                with TabbedContent():
+                with TabbedContent(initial="tab-telemetry"):
                     with TabPane("Live Telemetry", id="tab-telemetry"):
                         with Grid(id="telemetry-grid"):
-                            # Agent Workspace (Thoughts, Code) | Docker Logs (Stdout, Stderr)
                             yield RichLog(id="agent-workspace", highlight=True, markup=True)
                             yield RichLog(id="docker-sandbox", highlight=True)
                     
                     with TabPane("Code Context", id="tab-context"):
-                        yield Static("Selected Target code will render here.", id="context-viewer")
+                        # Now used to display the selected search target
+                        yield Static("Search for a target to view its source code here.", id="context-viewer")
                     
                     with TabPane("Execution Report", id="tab-report"):
                         yield Static("Verdict, JWTs, Mock IDs, and Stats.", id="report-viewer")
