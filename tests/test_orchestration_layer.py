@@ -73,7 +73,8 @@ def mock_evaluator_llm():
 def orchestrator(mock_coder_llm, mock_evaluator_llm):
     """Provides a fully instantiated Orchestrator with mocked LLMs and Execution Layer."""
     orch = SunderOrchestrator(
-        coder_llm=mock_coder_llm,
+        baseline_coder_llm=mock_coder_llm,
+        adversary_coder_llm=mock_coder_llm,
         evaluator_llm=mock_evaluator_llm,
         target_path="/fake/repo",
         image_tag="sunder-sandbox:latest"
@@ -106,7 +107,7 @@ async def test_adversary_coder_node_unmasks_secrets(orchestrator, dummy_state, m
     dummy_state.env_state.auth_headers = {"Authorization": SecretStr("Bearer 12345")}
     
     # Capture the exact inputs passed to the LLM
-    captured_inputs = {}
+    captured_inputs = None
     async def capture_invoke(inputs):
         nonlocal captured_inputs
         captured_inputs = inputs
@@ -115,10 +116,12 @@ async def test_adversary_coder_node_unmasks_secrets(orchestrator, dummy_state, m
     mock_coder_llm.with_structured_output.return_value = RunnableLambda(capture_invoke)
     
     await orchestrator.adversary_coder_node(dummy_state)
+
+    prompt_text = captured_inputs.to_string()
     
     # Ensure the secret was unmasked in the prompt string
-    assert "Bearer 12345" in captured_inputs["env_state"]
-    assert "**********" not in captured_inputs["env_state"]
+    assert "Bearer 12345" in prompt_text
+    assert "**********" not in prompt_text
 
 
 def test_executor_node(orchestrator, dummy_state):

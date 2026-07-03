@@ -30,8 +30,9 @@ class SunderOrchestrator:
     Object-Oriented LangGraph Orchestrator.
     Persists BYOK models and static infrastructure variables at the instance level.
     """
-    def __init__(self, coder_llm, evaluator_llm, target_path: str, image_tag: str):
-        self.coder_llm = coder_llm
+    def __init__(self, baseline_coder_llm, adversary_coder_llm, evaluator_llm, target_path: str, image_tag: str):
+        self.baseline_coder_llm = baseline_coder_llm
+        self.adversary_coder_llm = adversary_coder_llm
         self.evaluator_llm = evaluator_llm
         self.target_path = target_path
         self.image_tag = image_tag
@@ -47,7 +48,7 @@ class SunderOrchestrator:
         target = state.context.target_node
         logger.debug(f"Executing baseline_coder_node for '{target.symbol_name}' (Attempt {state.retry_count + 1}/{state.max_retries})")
         
-        structured_llm = self.coder_llm.with_structured_output(CoderOutput)
+        structured_llm = self.baseline_coder_llm.with_structured_output(CoderOutput)
         chain = BASELINE_CODER_PROMPT | structured_llm
         
         response: CoderOutput = await chain.ainvoke({
@@ -79,7 +80,7 @@ class SunderOrchestrator:
                 "ephemeral_files": env.ephemeral_files
             }
 
-        structured_llm = self.coder_llm.with_structured_output(CoderOutput)
+        structured_llm = self.adversary_coder_llm.with_structured_output(CoderOutput)
         chain = ADVERSARY_CODER_PROMPT | structured_llm
         
         response: CoderOutput = await chain.ainvoke({
