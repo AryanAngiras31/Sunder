@@ -37,7 +37,7 @@ class SunderApp(App):
     #sidebar-column {
         layout: grid;
         grid-size: 1 2; 
-        grid-rows: 4fr 6fr; /* Config Panel needs a bit more space now */
+        grid-rows: 4fr 6fr; 
         height: 100%;
     }
     .pane {
@@ -50,9 +50,48 @@ class SunderApp(App):
         margin-bottom: 1; content-align: center middle; width: 100%;
     }
     #target-explorer Input { margin-bottom: 1; }
-    .config-label { margin-top: 1; color: #888888; }
     
-    #env-var-btn { margin-top: 1; width: 100%; }
+    /* --- COMPACT CONFIG PANEL --- */
+    .config-label { 
+        margin-top: 1; /* Compress spacing */
+        color: #888888; 
+    }
+    
+    /* Remove default border around radio buttons to save vertical space */
+    #mode-toggle {
+        border: round $border-color;
+        background: transparent;
+        height: auto;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Transparent background eliminates the ugly gray box around the rounded border */
+    #sandbox-config Input {
+        height: 3;
+        padding: 0 1; 
+        border: round $border-color;
+        margin: 0; 
+        background: transparent; 
+    }
+    #sandbox-config Input:focus {
+        border: round $focus-border-color;
+    }
+
+    /* Turn the default button into a minimalist, 1-line clickable text trigger */
+    #env-var-btn {
+        width: 100%;
+        height: 1;
+        border: none;
+        background: transparent;
+        color: $accent-color;
+        margin: 0 0 0 0;
+        content-align: center middle;
+    }
+    #env-var-btn:hover, #env-var-btn:focus {
+        color: $focus-border-color;
+        text-style: bold;
+    }
 
     #workspace-column { height: 100%; }
     TabbedContent { height: 100%; }
@@ -158,8 +197,6 @@ class SunderApp(App):
         with Container(id="main-container"):
             with Container(id="sidebar-column"):
                 yield TargetExplorerPane(classes="pane", id="target-explorer")
-                
-                # INJECTED CONFIG PANEL
                 yield ConfigPanel(classes="pane", id="sandbox-config")
 
             with Container(classes="pane", id="workspace-column"):
