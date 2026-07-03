@@ -2,28 +2,16 @@ import os
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical, Grid
-from textual.widgets import (
-    Header, 
-    Footer, 
-    Static, 
-    TabbedContent, 
-    TabPane,
-    Input,
-    OptionList,
-    RadioSet,
-    RadioButton,
-    Switch,
-    RichLog,
-    Label
-)
+from textual.widgets import Header, Footer, Static, TabbedContent, TabPane, RichLog
 
 # Sunder Core Imports
 from sunder.execution.bootstrapper import Bootstrapper
 from sunder.knowledge.database import KnowledgeDatabase
 from sunder.knowledge.ingestion import IngestionEngine
 
-# Import our newly created HITL Search Pane
+# TUI Components
 from sunder.client.hitl_search import TargetExplorerPane
+from sunder.client.config_panel import ConfigPanel
 
 class SunderApp(App):
     """Sunder's primary LazyDocker-style TUI interface."""
@@ -32,7 +20,6 @@ class SunderApp(App):
     SUB_TITLE = "Zero-Trust Agentic Fuzzer"
 
     CSS = """
-    /* --- CSS Variables for Theming --- */
     $border-color: #5a5a5a;
     $focus-border-color: #00ff00;
     $panel-bg: #1e1e1e;
@@ -45,47 +32,34 @@ class SunderApp(App):
         layout: grid;
         grid-size: 2 1; 
         grid-columns: 3fr 7fr; 
-        height: 100%;
-        width: 100%;
+        height: 100%; width: 100%;
     }
-
     #sidebar-column {
         layout: grid;
         grid-size: 1 2; 
-        grid-rows: 6fr 4fr; 
+        grid-rows: 4fr 6fr; /* Config Panel needs a bit more space now */
         height: 100%;
     }
-
     .pane {
-        border: round $border-color;
-        background: $panel-bg;
-        color: $text-primary;
-        margin: 0 1 1 1;
-        padding: 0 1;
+        border: round $border-color; background: $panel-bg;
+        color: $text-primary; margin: 0 1 1 1; padding: 0 1;
     }
-
     .pane:focus-within { border: round $focus-border-color; }
-
     .pane-title {
-        color: $accent-color;
-        text-style: bold;
-        margin-bottom: 1;
-        content-align: center middle;
-        width: 100%;
+        color: $accent-color; text-style: bold;
+        margin-bottom: 1; content-align: center middle; width: 100%;
     }
-
     #target-explorer Input { margin-bottom: 1; }
     .config-label { margin-top: 1; color: #888888; }
+    
+    #env-var-btn { margin-top: 1; width: 100%; }
+
     #workspace-column { height: 100%; }
     TabbedContent { height: 100%; }
     
     #telemetry-grid {
-        layout: grid;
-        grid-size: 2 1;
-        grid-columns: 1fr 1fr;
-        height: 100%;
+        layout: grid; grid-size: 2 1; grid-columns: 1fr 1fr; height: 100%;
     }
-    
     #telemetry-grid RichLog { border: solid $border-color; height: 100%; }
     #telemetry-grid RichLog:focus { border: solid $focus-border-color; }
     """
@@ -93,8 +67,7 @@ class SunderApp(App):
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("tab", "app.focus_next", "Change Pane"),
-        ("s", "start_run", "Start Run"),
-        ("m", "toggle_mode", "Toggle Mode")
+        ("s", "start_run", "Start Run")
     ]
 
     def __init__(self):
@@ -134,27 +107,10 @@ class SunderApp(App):
             )
         except Exception as e:
             error_message = f"Startup Failed: {str(e)}"
-            
-            self.app.call_from_thread(
-                self.notify, 
-                error_message, 
-                title="Fatal Error 🔴", 
-                severity="error", 
-                timeout=10
-            )
-            self.app.call_from_thread(self._log_system_error, error_message)
+            self.app.call_from_thread(self.notify, error_message, title="Fatal Error 🔴", severity="error", timeout=15)
 
-    def _log_system_error(self, message: str) -> None:
-        """Safely writes system errors to the UI from the background thread."""
-        try:
-            agent_log = self.query_one("#agent-workspace", RichLog)
-            agent_log.write(f"[bold red]SYSTEM ERROR:[/bold red] {message}")
-        except Exception:
-            pass 
-
-    async def on_option_list_option_selected(self, message: OptionList.OptionSelected) -> None:
+    async def on_option_list_option_selected(self, message) -> None:
         """Fires when the user hits 'Enter' on an AST search result."""
-        # Grab the node_id we tucked into the Option object
         self.selected_target_id = message.option.id
         
         # Fetch the full CodeNode from the database
@@ -171,36 +127,41 @@ class SunderApp(App):
             # Format nicely for the UI
             header = f"[bold cyan]Selected Target:[/bold cyan] {target_node.symbol_name} ({target_node.file_path})\n\n"
             context_viewer.update(header + target_node.source_code)
-            
             self.notify(f"Target selected: {target_node.symbol_name}", title="Target Selected")
 
+    def action_start_run(self) -> None:
+        """Triggered via the [s] hotkey."""
+        if not self.selected_target_id:
+            self.notify("Please select a target function first.", title="Error", severity="error")
+            return
+            
+        config_panel = self.query_one(ConfigPanel)
+        mode = config_panel.get_current_mode()
+        profile = config_panel.get_sandbox_profile(custom_image=self.image_tag)
+        
+        # Log to telemetry to verify everything is hooked up
+        agent_log = self.query_one("#agent-workspace", RichLog)
+        agent_log.clear()
+        agent_log.write(f"[bold green]Initiating LangGraph Orchestrator...[/bold green]")
+        agent_log.write(f"Mode: [cyan]{mode.value}[/cyan]")
+        agent_log.write(f"Network: [cyan]{profile.network_mode.value}[/cyan]")
+        agent_log.write(f"Limits: RAM={profile.memory_limit}, CPU={profile.cpu_quota}, Timeout={profile.timeout_seconds}s")
+        agent_log.write(f"Injected Env Vars: {len(profile.environment_vars)}")
+        
+        self.notify(f"Starting {mode.value} execution loop...", title="Run Started")
+        
+        # PHASE 2 TODO: Call Orchestrator passing the selected target and profile schemas.
+
     def compose(self) -> ComposeResult:
-        """Construct the UI hierarchy."""
         yield Header(show_clock=True)
         
         with Container(id="main-container"):
-            
-            # --- LEFT COLUMN: Control Sidebar ---
             with Container(id="sidebar-column"):
-                
-                # INJECTED HITL SEARCH PANE
                 yield TargetExplorerPane(classes="pane", id="target-explorer")
                 
-                with Vertical(classes="pane", id="sandbox-config"):
-                    yield Static("Zero-Trust Config", classes="pane-title")
-                    
-                    yield Label("Execution Mode", classes="config-label")
-                    with RadioSet(id="mode-toggle"):
-                        yield RadioButton("Baseline (Seeding)", value=True)
-                        yield RadioButton("Adversarial (Fuzzing)")
-                    
-                    yield Label("Network Access (Bridge)", classes="config-label")
-                    yield Switch(value=False, id="network-switch")
-                    
-                    yield Label("Memory Limit", classes="config-label")
-                    yield Input(value="512m", id="memory-input")
+                # INJECTED CONFIG PANEL
+                yield ConfigPanel(classes="pane", id="sandbox-config")
 
-            # --- RIGHT COLUMN: Main Workspace ---
             with Container(classes="pane", id="workspace-column"):
                 with TabbedContent(initial="tab-telemetry"):
                     with TabPane("Live Telemetry", id="tab-telemetry"):
@@ -209,7 +170,6 @@ class SunderApp(App):
                             yield RichLog(id="docker-sandbox", highlight=True)
                     
                     with TabPane("Code Context", id="tab-context"):
-                        # Now used to display the selected search target
                         yield Static("Search for a target to view its source code here.", id="context-viewer")
                     
                     with TabPane("Execution Report", id="tab-report"):
