@@ -12,6 +12,7 @@ from sunder.knowledge.ingestion import IngestionEngine
 # TUI Components
 from sunder.client.hitl_search import TargetExplorerPane
 from sunder.client.config_panel import ConfigPanel
+from sunder.client.dashboard import TelemetryDashboard
 
 class SunderApp(App):
     """Sunder's primary LazyDocker-style TUI interface."""
@@ -32,7 +33,7 @@ class SunderApp(App):
         grid-size: 2 1; 
         grid-columns: 3fr 7fr; 
         height: 100%; width: 100%;
-        padding: 0 1;
+        padding: 0 1; 
     }
     #sidebar-column {
         layout: grid;
@@ -42,7 +43,7 @@ class SunderApp(App):
     }
     .pane {
         border: round $border-color; 
-        background: transparent; 
+        background: transparent;
         color: $text-primary; 
         margin: 0; 
         padding: 0 1;
@@ -56,58 +57,89 @@ class SunderApp(App):
     
     /* --- COMPACT CONFIG PANEL --- */
     .config-label { 
-        margin: 0;
+        margin: 0; 
         color: #888888; 
     }
     
-    /* Unified styling for all Config Panel elements to match borders */
     #mode-toggle, #sandbox-config Input, #network-switch, #env-var-btn {
         border: round $border-color;
         background: transparent;
         margin: 0;
-        margin-bottom: 1; /* Provides the spacing instead of the label */
+        margin-bottom: 1; 
     }
 
-    /* Unified Focus States */
     #mode-toggle:focus-within, #sandbox-config Input:focus, #network-switch:focus, #env-var-btn:focus, #env-var-btn:hover {
         border: round $focus-border-color;
     }
 
-    /* Specific element tweaks */
     #mode-toggle {
         height: auto;
         padding: 0;
     }
 
-    #sandbox-config Input, #network-switch, #env-var-btn {
-        height: 3; /* Forces exactly 3 lines: Top Border, Content, Bottom Border */
+    #sandbox-config Input, #network-switch {
+        height: 3; 
         padding: 0 1;
     }
 
     #env-var-btn {
         width: 100%;
         height: 3;
-        border: round $border-color;
-        background: transparent;
         color: $accent-color;
-        margin: 0;
         content-align: center middle;
     }
     #env-var-btn:hover, #env-var-btn:focus {
-        border: round $focus-border-color;
         color: $focus-border-color;
         text-style: bold;
     }
 
-    /* --- TELEMETRY --- */
-    #workspace-column { height: 100%; }
-    TabbedContent { height: 100%; }
+    /* --- TELEMETRY DASHBOARD OVERRIDES --- */
+    #workspace-column { 
+        height: 100%; 
+        padding: 1; 
+    }
+    
+    TelemetryDashboard {
+        height: 100%;
+        width: 100%;
+    }
+    
+    TelemetryDashboard > TabbedContent { 
+        height: 100%; 
+    }
+    
+    ContentTabs {
+        height: 3;
+        margin-bottom: 1;
+        background: transparent; 
+    }
+
+    ContentSwitcher {
+        height: 1fr;
+    }
+
+    TabPane {
+        height: 100%;
+        padding: 0; 
+    }
     
     #telemetry-grid {
-        layout: grid; grid-size: 2 1; grid-columns: 1fr 1fr; height: 100%;
+        layout: grid; 
+        grid-size: 2 1; 
+        grid-columns: 1fr 1fr; 
+        height: 100%;
     }
-    #telemetry-grid RichLog { border: solid $border-color; height: 100%; }
-    #telemetry-grid RichLog:focus { border: solid $focus-border-color; }
+    
+    #telemetry-grid RichLog { 
+        border: round $border-color; 
+        height: 100%; 
+        background: transparent; 
+        margin: 0 1; 
+    }
+    
+    #telemetry-grid RichLog:focus { 
+        border: round $focus-border-color; 
+    }
     """
 
     BINDINGS = [
@@ -163,16 +195,16 @@ class SunderApp(App):
         target_node = self.knowledge_db.get_node(self.selected_target_id)
         
         if target_node:
-            # Shift UI focus to the Dashboard and open the Code Context tab
-            tabs = self.query_one(TabbedContent)
-            tabs.active = "tab-context"
+            dashboard = self.query_one(TelemetryDashboard)
             
-            # Print the source code to the context viewer
-            context_viewer = self.query_one("#context-viewer", Static)
+            # Pass the raw components to the dashboard so it can render the Syntax block
+            header = f"[bold cyan]Selected Target:[/bold cyan] {target_node.symbol_name} ({target_node.file_path})\n"
             
-            # Format nicely for the UI
-            header = f"[bold cyan]Selected Target:[/bold cyan] {target_node.symbol_name} ({target_node.file_path})\n\n"
-            context_viewer.update(header + target_node.source_code)
+            dashboard.update_context(
+                source_code=target_node.source_code, 
+                language=target_node.language, 
+                header_text=header
+            )
             self.notify(f"Target selected: {target_node.symbol_name}", title="Target Selected")
 
     def action_start_run(self) -> None:
@@ -185,14 +217,19 @@ class SunderApp(App):
         mode = config_panel.get_current_mode()
         profile = config_panel.get_sandbox_profile(custom_image=self.image_tag)
         
-        # Log to telemetry to verify everything is hooked up
-        agent_log = self.query_one("#agent-workspace", RichLog)
-        agent_log.clear()
-        agent_log.write(f"[bold green]Initiating LangGraph Orchestrator...[/bold green]")
-        agent_log.write(f"Mode: [cyan]{mode.value}[/cyan]")
-        agent_log.write(f"Network: [cyan]{profile.network_mode.value}[/cyan]")
-        agent_log.write(f"Limits: RAM={profile.memory_limit}, CPU={profile.cpu_quota}, Timeout={profile.timeout_seconds}s")
-        agent_log.write(f"Injected Env Vars: {len(profile.environment_vars)}")
+        # Grab the dashboard and use its API
+        dashboard = self.query_one(TelemetryDashboard)
+        dashboard.clear_agent()
+        
+        # Switch the UI back to the telemetry tab automatically when a run starts
+        tabs = self.query_one("TabbedContent")
+        tabs.active = "tab-telemetry"
+
+        dashboard.write_agent(f"[bold green]Initiating LangGraph Orchestrator...[/bold green]")
+        dashboard.write_agent(f"Mode: [cyan]{mode.value}[/cyan]")
+        dashboard.write_agent(f"Network: [cyan]{profile.network_mode.value}[/cyan]")
+        dashboard.write_agent(f"Limits: RAM={profile.memory_limit}, CPU={profile.cpu_quota}, Timeout={profile.timeout_seconds}s")
+        dashboard.write_agent(f"Injected Env Vars: {len(profile.environment_vars)}")
         
         self.notify(f"Starting {mode.value} execution loop...", title="Run Started")
         
@@ -207,17 +244,7 @@ class SunderApp(App):
                 yield ConfigPanel(classes="pane", id="sandbox-config")
 
             with Container(classes="pane", id="workspace-column"):
-                with TabbedContent(initial="tab-telemetry"):
-                    with TabPane("Code Context", id="tab-context"):
-                        yield Static("Search for a target to view its source code here.", id="context-viewer")
-                        
-                    with TabPane("Live Telemetry", id="tab-telemetry"):
-                        with Grid(id="telemetry-grid"):
-                            yield RichLog(id="agent-workspace", highlight=True, markup=True)
-                            yield RichLog(id="docker-sandbox", highlight=True)
-                    
-                    with TabPane("Execution Report", id="tab-report"):
-                        yield Static("Verdict, JWTs, Mock IDs, and Stats.", id="report-viewer")
+                yield TelemetryDashboard()
 
         yield Footer()
 
