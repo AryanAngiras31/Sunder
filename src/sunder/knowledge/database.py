@@ -148,7 +148,7 @@ class KnowledgeDatabase:
 
         return nodes
  
-    def fuzzy_search_symbols(self, query: str, limit: int = 10) -> List[tuple[str, str, str, str]]:
+    def fuzzy_search_symbols(self, query: str, limit: int = 5) -> List[tuple[str, str, str, str]]:
         """
         Used by the TUI for Human-In-The-Loop Target Disambiguation.
         Returns: List of (node_id, symbol_name, node_type, file_path)
@@ -166,7 +166,8 @@ class KnowledgeDatabase:
                 SELECT f.node_id, f.symbol_name, c.node_type, c.file_path 
                 FROM code_nodes_fts f
                 JOIN code_nodes c ON f.node_id = c.node_id
-                WHERE f.symbol_name LIKE ? 
+                WHERE c.node_type IN ('function','method')
+                AND f.symbol_name LIKE ? 
                 ORDER BY length(f.symbol_name) ASC 
                 LIMIT ?
             """, (f'%{clean_query}%', limit))
@@ -185,7 +186,8 @@ class KnowledgeDatabase:
                 SELECT f.node_id, f.symbol_name, c.node_type, c.file_path 
                 FROM code_nodes_fts f
                 JOIN code_nodes c ON f.node_id = c.node_id
-                WHERE f.symbol_name MATCH ? 
+                WHERE c.node_type IN ('function','method')
+                AND f.symbol_name MATCH ? 
                 ORDER BY f.rank 
                 LIMIT ?
             """, (clean_query, limit))

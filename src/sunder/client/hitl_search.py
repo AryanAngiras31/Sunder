@@ -36,7 +36,7 @@ class TargetExplorerPane(Vertical):
             
             for node_id, symbol_name, node_type, file_path in results:
                 # Format the text using Textual's Rich markup for clean visuals
-                display_text = f"{symbol_name} [[dim]{node_type.upper()}[/dim]] \n  ↳ [dim italic]{file_path}[/dim]"
+                display_text = f"{symbol_name} [dim italic]({file_path})[/]"
                 
                 # We store the node_id as the Option ID so we can retrieve the exact AST chunk later
                 option_list.add_option(Option(display_text, id=node_id))
