@@ -22,7 +22,6 @@ class SunderApp(App):
     CSS = """
     $border-color: #5a5a5a;
     $focus-border-color: #00ff00;
-    $panel-bg: #1e1e1e;
     $text-primary: #e0e0e0;
     $accent-color: #00ffff;
 
@@ -33,6 +32,7 @@ class SunderApp(App):
         grid-size: 2 1; 
         grid-columns: 3fr 7fr; 
         height: 100%; width: 100%;
+        padding: 0 1;
     }
     #sidebar-column {
         layout: grid;
@@ -41,8 +41,11 @@ class SunderApp(App):
         height: 100%;
     }
     .pane {
-        border: round $border-color; background: $panel-bg;
-        color: $text-primary; margin: 0 1 1 1; padding: 0 1;
+        border: round $border-color; 
+        background: transparent; 
+        color: $text-primary; 
+        margin: 0; 
+        padding: 0 1;
     }
     .pane:focus-within { border: round $focus-border-color; }
     .pane-title {
@@ -53,7 +56,7 @@ class SunderApp(App):
     
     /* --- COMPACT CONFIG PANEL --- */
     .config-label { 
-        margin: 0; /* Zero margin to compress vertical space */
+        margin: 0;
         color: #888888; 
     }
     
@@ -83,10 +86,15 @@ class SunderApp(App):
 
     #env-var-btn {
         width: 100%;
+        height: 3;
+        border: round $border-color;
+        background: transparent;
         color: $accent-color;
+        margin: 0;
         content-align: center middle;
     }
     #env-var-btn:hover, #env-var-btn:focus {
+        border: round $focus-border-color;
         color: $focus-border-color;
         text-style: bold;
     }
@@ -200,13 +208,13 @@ class SunderApp(App):
 
             with Container(classes="pane", id="workspace-column"):
                 with TabbedContent(initial="tab-telemetry"):
+                    with TabPane("Code Context", id="tab-context"):
+                        yield Static("Search for a target to view its source code here.", id="context-viewer")
+                        
                     with TabPane("Live Telemetry", id="tab-telemetry"):
                         with Grid(id="telemetry-grid"):
                             yield RichLog(id="agent-workspace", highlight=True, markup=True)
                             yield RichLog(id="docker-sandbox", highlight=True)
-                    
-                    with TabPane("Code Context", id="tab-context"):
-                        yield Static("Search for a target to view its source code here.", id="context-viewer")
                     
                     with TabPane("Execution Report", id="tab-report"):
                         yield Static("Verdict, JWTs, Mock IDs, and Stats.", id="report-viewer")
