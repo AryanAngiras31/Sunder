@@ -128,6 +128,39 @@ class SunderApp(App):
         margin: 0;
         height: 100%;
     }
+
+    TabbedContent { 
+        height: 100%; 
+        margin: 0; 
+        padding: 0; 
+    }
+    
+    TabbedContent > ContentTabs { 
+        height: 3; 
+        margin: 0; 
+        padding: 0; 
+        background: transparent;
+    }
+    
+    TabbedContent > ContentSwitcher { 
+        height: 1fr; 
+        padding: 0; 
+        margin: 0;
+    }
+    
+    TabPane { 
+        height: 100%; 
+        padding: 0; 
+        margin: 0;
+    }
+    
+    #context-viewer { 
+        height: 100%; 
+        width: 100%; 
+        padding: 0; 
+        margin: 0;
+        overflow-y: auto; 
+    }
     
     #telemetry-grid {
         layout: grid; 
@@ -210,8 +243,7 @@ class SunderApp(App):
                 source_code=target_node.source_code, 
                 language=target_node.language, 
                 header_text=header
-            )
-            self.notify(f"Target selected: {target_node.symbol_name}", title="Target Selected")
+            )   
 
     def action_start_run(self) -> None:
         """Triggered via the [s] hotkey."""
