@@ -37,7 +37,7 @@ class SunderApp(App):
     #sidebar-column {
         layout: grid;
         grid-size: 1 2; 
-        grid-rows: 4fr 6fr; 
+        grid-rows: 18 1fr; 
         height: 100%;
     }
     .pane {
@@ -53,39 +53,37 @@ class SunderApp(App):
     
     /* --- COMPACT CONFIG PANEL --- */
     .config-label { 
-        margin-top: 1; /* Compress spacing */
+        margin: 0; /* Zero margin to compress vertical space */
         color: #888888; 
     }
     
-    /* Remove default border around radio buttons to save vertical space */
-    #mode-toggle {
+    /* Unified styling for all Config Panel elements to match borders */
+    #mode-toggle, #sandbox-config Input, #network-switch, #env-var-btn {
         border: round $border-color;
         background: transparent;
-        height: auto;
         margin: 0;
-        padding: 0;
+        margin-bottom: 1; /* Provides the spacing instead of the label */
     }
 
-    /* Transparent background eliminates the ugly gray box around the rounded border */
-    #sandbox-config Input {
-        height: 3;
-        padding: 0 1; 
-        border: round $border-color;
-        margin: 0; 
-        background: transparent; 
-    }
-    #sandbox-config Input:focus {
+    /* Unified Focus States */
+    #mode-toggle:focus-within, #sandbox-config Input:focus, #network-switch:focus, #env-var-btn:focus, #env-var-btn:hover {
         border: round $focus-border-color;
     }
 
-    /* Turn the default button into a minimalist, 1-line clickable text trigger */
+    /* Specific element tweaks */
+    #mode-toggle {
+        height: auto;
+        padding: 0;
+    }
+
+    #sandbox-config Input, #network-switch, #env-var-btn {
+        height: 3; /* Forces exactly 3 lines: Top Border, Content, Bottom Border */
+        padding: 0 1;
+    }
+
     #env-var-btn {
         width: 100%;
-        height: 1;
-        border: none;
-        background: transparent;
         color: $accent-color;
-        margin: 0 0 0 0;
         content-align: center middle;
     }
     #env-var-btn:hover, #env-var-btn:focus {
@@ -93,6 +91,7 @@ class SunderApp(App):
         text-style: bold;
     }
 
+    /* --- TELEMETRY --- */
     #workspace-column { height: 100%; }
     TabbedContent { height: 100%; }
     
