@@ -1,8 +1,10 @@
 import logging
 from textual.app import ComposeResult
-from textual.containers import Grid
+from textual.containers import Grid, VerticalScroll
 from textual.widgets import Static, TabbedContent, TabPane, RichLog
 from rich.syntax import Syntax
+from rich.console import Group
+from rich.text import Text
 
 logger = logging.getLogger(__name__)
 
@@ -10,13 +12,13 @@ class TelemetryDashboard(Static):
     """The main workspace containing the telemetry logs, context viewer, and execution reports."""
 
     def compose(self) -> ComposeResult:
-        with TabbedContent(initial="tab-telemetry"):
+        with TabbedContent(initial="tab-context"):
 
             # Tab 1: Code Context
             with TabPane("Code Context", id="tab-context"):
-                # We use a static widget here to render the highlighted Markdown/Source
-                yield Static("Search for a target to view its source code here.", id="context-viewer")
-            
+                with VerticalScroll(id="context-scroll-container"):
+                    yield Static("Search for a target to view its source code here.", id="context-viewer")
+
             # Tab 2: Live Telemetry (Split Pane)
             with TabPane("Live Telemetry", id="tab-telemetry"):
                 with Grid(id="telemetry-grid"):
@@ -53,6 +55,7 @@ class TelemetryDashboard(Static):
     def update_context(self, source_code: str, language: str, header_text: str) -> None:
         """Update the Code Context tab with syntax-highlighted source code."""
         try:
+            # Explicitly query the Static widget, not the scroll view
             viewer = self.query_one("#context-viewer", Static)
             
             syntax_block = Syntax(
@@ -71,5 +74,10 @@ class TelemetryDashboard(Static):
             # Automatically switch to the context tab
             tabs = self.query_one(TabbedContent)
             tabs.active = "tab-context"
+            
+            # Auto-scroll to the top of the new code block
+            scroll_container = self.query_one("#context-scroll-container", VerticalScroll)
+            scroll_container.scroll_to(0, 0)
+            
         except Exception as e:
             logger.error(f"Failed to update context viewer: {e}")

@@ -1,8 +1,8 @@
 import os
 from textual import work
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical, Grid
-from textual.widgets import Header, Footer, Static, TabbedContent, TabPane, RichLog
+from textual.containers import Container
+from textual.widgets import Header, Footer
 
 # Sunder Core Imports
 from sunder.execution.bootstrapper import Bootstrapper
@@ -110,7 +110,7 @@ class SunderApp(App):
     
     ContentTabs {
         height: 3;
-        margin-bottom: 1;
+        margin-bottom: 0;
         background: transparent; 
     }
 
@@ -121,6 +121,12 @@ class SunderApp(App):
     TabPane {
         height: 100%;
         padding: 0; 
+    }
+
+    #context-scroll-container {
+        padding: 0;
+        margin: 0;
+        height: 100%;
     }
     
     #telemetry-grid {
@@ -134,7 +140,7 @@ class SunderApp(App):
         border: round $border-color; 
         height: 100%; 
         background: transparent; 
-        margin: 0 1; 
+        margin: 0 0; 
     }
     
     #telemetry-grid RichLog:focus { 
