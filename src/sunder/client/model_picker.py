@@ -6,15 +6,8 @@ from textual.widgets import Input, OptionList, Button, Static
 from textual.widgets.option_list import Option
 from textual.message import Message
 
-try:
-    from litellm import model_cost
-except ImportError:
-    # Fallback to prevent crashes if LiteLLM is missing
-    model_cost = {
-        "openai/gpt-4o": {"max_tokens": 128000, "input_cost_per_token": 0.000005},
-        "anthropic/claude-3-5-sonnet": {"max_tokens": 200000, "input_cost_per_token": 0.000003},
-        "ollama/llama3": {"max_tokens": 8192, "input_cost_per_token": 0},
-    }
+from litellm import model_cost
+
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +122,7 @@ class ModelPickerModal(ModalScreen[dict]):
             yield RoleCard("evaluator", "Evaluator Node", id="role-evaluator")
             
             with Vertical(id="bottom-section"):
-                yield Input(placeholder="Search LiteLLM registry (e.g. gpt-4o, claude)...", id="model-search")
+                yield Input(placeholder="Search LiteLLM registry", id="model-search")
                 yield OptionList(id="model-list")
                 
             with Horizontal(id="picker-actions"):
@@ -166,7 +159,7 @@ class ModelPickerModal(ModalScreen[dict]):
             if search_term in model_id.lower():
                 cost = data.get('input_cost_per_token', 0)
                 max_tokens = data.get('max_tokens', 'Unknown')
-                display = f"[bold]{model_id}[/bold] [dim italic]- Context: {max_tokens} | Cost/Token: ${cost:.6f}[/dim italic]"
+                display = f"[bold]{model_id}[/bold] [dim italic]- Context: {max_tokens} | Cost/1M Tokens: ${cost*10**6:.2f}[/dim italic]"
                 options.append(Option(display, id=model_id))
                 
         for opt in options:
@@ -191,7 +184,6 @@ class ModelPickerModal(ModalScreen[dict]):
             for card in self.query(RoleCard):
                 card.update_model(model_id)
                 
-            self.app.notify("Copied selection to all roles. Click another box to change them individually.", title="Models Assigned")
             # Auto-advance focus to the next logical role
             self.set_active_role("adversarial")
         else:

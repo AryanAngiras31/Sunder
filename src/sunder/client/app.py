@@ -206,7 +206,6 @@ class SunderApp(App):
         def update_models(new_selections: dict | None):
             if new_selections:
                 self.llm_selections = new_selections
-                self.notify("Orchestrator LLMs updated.", title="Models Saved", severity="information")
 
         # Push the modal onto the screen and pass it the current selections
         self.app.push_screen(ModelPickerModal(self.llm_selections), update_models)
