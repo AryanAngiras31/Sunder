@@ -16,7 +16,7 @@ from sunder.client.dashboard import TelemetryDashboard
 from sunder.client.model_picker import ModelPickerModal
 
 # Orchestration
-from langchain_litellm import ChatLiteLLM
+from langchain.chat_models import init_chat_model
 from sunder.orchestration.orchestrator import SunderOrchestrator
 from sunder.schema import SunderAgentState, BlastRadiusContext, EnvironmentState
 
@@ -259,9 +259,17 @@ class SunderApp(App):
         
         # 4. Initialize LLMs & Orchestrator
         try:
-            baseline_llm = ChatLiteLLM(model=self.llm_selections['baseline'], temperature=0.2)
-            adversary_llm = ChatLiteLLM(model=self.llm_selections['adversarial'], temperature=0.7)
-            evaluator_llm = ChatLiteLLM(model=self.llm_selections['evaluator'], temperature=0)
+            def create_llm(model_id: str, temperature: float):
+                # Safely handle LiteLLM strings whether they have a provider prefix or not
+                if "/" in model_id:
+                    provider, model_name = model_id.split("/", 1)
+                    return init_chat_model(model=model_name, model_provider=provider, temperature=temperature)
+                else:
+                    return init_chat_model(model=model_id, temperature=temperature)
+
+            baseline_llm = create_llm(self.llm_selections['baseline'], 0.2)
+            adversary_llm = create_llm(self.llm_selections['adversarial'], 0.7)
+            evaluator_llm = create_llm(self.llm_selections['evaluator'], 0)
             
             orchestrator = SunderOrchestrator(
                 baseline_coder_llm=baseline_llm,

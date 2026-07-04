@@ -149,13 +149,44 @@ class ModelPickerModal(ModalScreen[dict]):
     def on_role_card_role_clicked(self, message: RoleCard.RoleClicked) -> None:
         self.set_active_role(message.role_id)
 
+    def _get_available_providers(self) -> set:
+        """Determines which provider prefixes to show based on available API keys."""
+        import os
+        
+        available = {"ollama"} 
+        
+        if os.environ.get("OPENAI_API_KEY"):
+            available.add("openai")
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            available.add("anthropic")
+        if os.environ.get("OPENROUTER_API_KEY"):
+            available.add("openrouter")
+        if os.environ.get("GROQ_API_KEY"):
+            available.add("groq")
+        if os.environ.get("MISTRAL_API_KEY"):
+            available.add("mistral")
+        if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+            available.update(["gemini", "vertex_ai"])
+            
+        return available
+
     def _populate_list(self, search_term: str) -> None:
         option_list = self.query_one("#model-list", OptionList)
         option_list.clear_options()
         search_term = search_term.lower()
+
+        # Fetch the set of providers the user is actually allowed to use
+        available_providers = self._get_available_providers()
         
         options = []
         for model_id, data in model_cost.items():
+            # Extract the provider prefix from the LiteLLM string (e.g. 'openai' from 'openai/gpt-4o')
+            provider = model_id.split("/")[0] if "/" in model_id else "unknown"
+            
+            # If the user doesn't have the key, don't show the model.
+            if provider not in available_providers:
+                continue
+
             if search_term in model_id.lower():
                 cost = data.get('input_cost_per_token', 0)
                 max_tokens = data.get('max_tokens', 'Unknown')
