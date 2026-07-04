@@ -15,6 +15,11 @@ from sunder.client.config_panel import ConfigPanel
 from sunder.client.dashboard import TelemetryDashboard
 from sunder.client.model_picker import ModelPickerModal
 
+# Orchestration
+from langchain_litellm import ChatLiteLLM
+from sunder.orchestration.orchestrator import SunderOrchestrator
+from sunder.schema import SunderAgentState, BlastRadiusContext, EnvironmentState
+
 class SunderApp(App):
     """Sunder's primary LazyDocker-style TUI interface."""
 
@@ -140,7 +145,7 @@ class SunderApp(App):
         super().__init__()
         self.image_tag = None
         self.knowledge_db = None
-        self.selected_target_id = None
+        self.selected_target_node = None
         
         self.llm_selections = {
             "baseline": "-NA-",
@@ -183,12 +188,14 @@ class SunderApp(App):
 
     async def on_option_list_option_selected(self, message) -> None:
         """Fires when the user hits 'Enter' on an AST search result."""
-        self.selected_target_id = message.option.id
+        selected_id = message.option.id
         
         # Fetch the full CodeNode from the database
-        target_node = self.knowledge_db.get_node(self.selected_target_id)
+        target_node = self.knowledge_db.get_node(selected_id)
         
         if target_node:
+            self.selected_target_node = target_node
+
             dashboard = self.query_one(TelemetryDashboard)
             
             # Pass the raw components to the dashboard so it can render the Syntax block
@@ -211,15 +218,28 @@ class SunderApp(App):
         self.app.push_screen(ModelPickerModal(self.llm_selections), update_models)
 
     def action_start_run(self) -> None:
-        """Triggered via the [s] hotkey. Instantly starts the run."""
-        if not self.selected_target_id:
+        """Triggered via the [s] hotkey. Checks prerequisites and instantly starts the run."""
+        
+        # 1. Prerequisite Checks
+        if not self.selected_target_node:
             self.notify("Please select a target function first.", title="Error", severity="error")
             return
             
+        if not self.image_tag:
+            self.notify("Please wait for the Docker Bootstrapper to finish building.", title="Not Ready", severity="warning")
+            return
+            
+        if any(v == "-NA-" for v in self.llm_selections.values()):
+            self.notify("Please press [p] to configure models for all 3 roles before starting.", title="Incomplete Models", severity="error")
+            return
+
+        # 2. Retrieve State Components
         config_panel = self.query_one(ConfigPanel)
         mode = config_panel.get_current_mode()
         profile = config_panel.get_sandbox_profile(custom_image=self.image_tag)
+        target_node = self.selected_target_node
         
+        # 3. Setup Dashboard
         dashboard = self.query_one(TelemetryDashboard)
         dashboard.clear_agent()
         
@@ -228,20 +248,84 @@ class SunderApp(App):
 
         dashboard.write_agent(f"[bold green]Initiating LangGraph Orchestrator...[/bold green]")
         dashboard.write_agent(f"Mode: [cyan]{mode.value}[/cyan]")
+        dashboard.write_agent(f"Target: [cyan]{target_node.symbol_name}[/cyan] ({target_node.file_path})")
         
-        # Log the LiteLLM Model choices
         dashboard.write_agent(f"Baseline Coder: [yellow]{self.llm_selections['baseline']}[/yellow]")
         dashboard.write_agent(f"Adversary Coder: [yellow]{self.llm_selections['adversarial']}[/yellow]")
         dashboard.write_agent(f"Evaluator Node: [yellow]{self.llm_selections['evaluator']}[/yellow]")
         dashboard.write_agent("---")
         
-        dashboard.write_agent(f"Network: [cyan]{profile.network_mode.value}[/cyan]")
-        dashboard.write_agent(f"Limits: RAM={profile.memory_limit}, CPU={profile.cpu_quota}, Timeout={profile.timeout_seconds}s")
-        dashboard.write_agent(f"Injected Env Vars: {len(profile.environment_vars)}\n")
-        
         self.notify(f"Starting {mode.value} execution loop...", title="Run Started")
         
-        # PHASE 2 TODO: Call Orchestrator passing the selected target and profile schemas.
+        # 4. Initialize LLMs & Orchestrator
+        try:
+            baseline_llm = ChatLiteLLM(model=self.llm_selections['baseline'], temperature=0.2)
+            adversary_llm = ChatLiteLLM(model=self.llm_selections['adversarial'], temperature=0.7)
+            evaluator_llm = ChatLiteLLM(model=self.llm_selections['evaluator'], temperature=0)
+            
+            orchestrator = SunderOrchestrator(
+                baseline_coder_llm=baseline_llm,
+                adversary_coder_llm=adversary_llm,
+                evaluator_llm=evaluator_llm,
+                target_path=target_node.file_path,
+                image_tag=self.image_tag
+            )
+            
+            graph = orchestrator.build_graph()
+            
+            # Construct the Initial State
+            initial_state = SunderAgentState(
+                mode=mode,
+                context=BlastRadiusContext(
+                    target_node=target_node,
+                    children=[],
+                    parents=[]
+                ),
+                sandbox_config=profile,
+                env_state=EnvironmentState(),
+                retry_count=0,
+                max_retries=3
+            )
+            
+            # 5. Kick off background execution
+            self.run_orchestration_loop(graph, initial_state)
+            
+        except Exception as e:
+            dashboard.write_agent(f"[bold red]Failed to initialize Orchestrator: {e}[/bold red]")
+            self.notify(f"Failed to start Orchestrator.", title="Error", severity="error")
+
+    @work
+    async def run_orchestration_loop(self, graph, initial_state: SunderAgentState) -> None:
+        """Runs the compiled LangGraph asynchronously to prevent UI freezing."""
+        dashboard = self.query_one(TelemetryDashboard)
+        try:
+            # LangGraph's astream yields dicts containing updates from each node as they complete
+            async for output in graph.astream(initial_state):
+                for node_name, state_update in output.items():
+                    dashboard.write_agent(f"\n[bold magenta]>[/bold magenta] Node [cyan]{node_name}[/cyan] completed.")
+                    
+                    # Log interesting parts of the state update safely
+                    if "current_test_script" in state_update:
+                        dashboard.write_agent(f"Generated payload (length: {len(state_update['current_test_script'])} chars)")
+                        
+                    if "execution_report" in state_update:
+                        report = state_update["execution_report"]
+                        color = "green" if report.exit_code == 0 else "red"
+                        dashboard.write_agent(f"Sandbox Exit Code: [bold {color}]{report.exit_code}[/bold {color}]")
+                        
+                    if "final_verdict" in state_update:
+                        verdict = state_update["final_verdict"]
+                        dashboard.write_agent(f"Evaluator Verdict: [bold yellow]{verdict.value}[/bold yellow]")
+                        
+                    if "evaluator_feedback" in state_update:
+                        dashboard.write_agent(f"Feedback: [dim]{state_update['evaluator_feedback']}[/dim]")
+                        
+            dashboard.write_agent(f"\n[bold green]Run Completed.[/bold green]")
+            self.notify("Orchestration loop finished.", title="Run Complete", severity="information")
+            
+        except Exception as e:
+            dashboard.write_agent(f"\n[bold red]Orchestrator Execution Error: {e}[/bold red]")
+            self.notify("Execution failed. See telemetry for details.", title="Fatal Error", severity="error")
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
