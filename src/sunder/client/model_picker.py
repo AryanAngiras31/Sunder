@@ -1,0 +1,210 @@
+import logging
+from textual.app import ComposeResult
+from textual.screen import ModalScreen
+from textual.containers import Container, Horizontal, Vertical
+from textual.widgets import Input, OptionList, Button, Static
+from textual.widgets.option_list import Option
+from textual.message import Message
+
+try:
+    from litellm import model_cost
+except ImportError:
+    # Fallback to prevent crashes if LiteLLM is missing
+    model_cost = {
+        "openai/gpt-4o": {"max_tokens": 128000, "input_cost_per_token": 0.000005},
+        "anthropic/claude-3-5-sonnet": {"max_tokens": 200000, "input_cost_per_token": 0.000003},
+        "ollama/llama3": {"max_tokens": 8192, "input_cost_per_token": 0},
+    }
+
+logger = logging.getLogger(__name__)
+
+class RoleCard(Static):
+    """Custom clickable card for the top 30% of the modal."""
+    
+    class RoleClicked(Message):
+        def __init__(self, role_id: str):
+            self.role_id = role_id
+            super().__init__()
+
+    def __init__(self, role_id: str, label: str, **kwargs):
+        super().__init__(**kwargs)
+        self.role_id = role_id
+        self.label = label
+        self.model_id = "-NA-"
+
+    def render(self):
+        # Uses Rich formatting for the title and dim small text
+        return f"[bold cyan]{self.label}[/bold cyan]\n[dim]{self.model_id}[/dim]"
+
+    def on_click(self) -> None:
+        self.post_message(self.RoleClicked(self.role_id))
+        
+    def update_model(self, model_id: str):
+        self.model_id = model_id
+        self.refresh()
+
+
+class ModelPickerModal(ModalScreen[dict]):
+    """A 30:70 split modal to pick LangGraph models using LiteLLM."""
+    
+    CSS = """
+    ModelPickerModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.85);
+    }
+    
+    #picker-container {
+        width: 85%;
+        height: 85%;
+        background: #1e1e1e;
+        border: round #00ffff;
+        padding: 1 2;
+        layout: grid;
+        grid-size: 3 3; 
+        grid-columns: 1fr 1fr 1fr;
+        /* Top 30%, Middle 70%, Bottom row for buttons */
+        grid-rows: 30% 1fr 3;
+    }
+    
+    RoleCard {
+        border: round #5a5a5a;
+        background: #2a2a2a;
+        content-align: center middle;
+        height: 100%;
+        margin: 0 1;
+    }
+    RoleCard:hover {
+        background: #333333;
+    }
+    RoleCard.active {
+        border: round #00ff00; /* Highlight active role */
+    }
+    
+    #bottom-section {
+        column-span: 3;
+        layout: vertical;
+        height: 100%;
+        margin-top: 1;
+        padding: 0 1;
+    }
+    
+    #model-search {
+        height: 3;
+        border: round #5a5a5a;
+        background: #2a2a2a;
+        margin-bottom: 1;
+    }
+    #model-search:focus { border: round #00ff00; }
+    
+    #model-list {
+        height: 1fr;
+        border: round #5a5a5a;
+        background: transparent;
+    }
+    #model-list:focus { border: round #00ff00; }
+    
+    #picker-actions {
+        column-span: 3;
+        align: right middle;
+        height: 3;
+        margin-top: 1;
+        padding-right: 1;
+    }
+    #picker-actions Button { margin-left: 1; }
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model_selections = {
+            "baseline": "-NA-",
+            "adversarial": "-NA-",
+            "evaluator": "-NA-"
+        }
+        self.active_role = "baseline"
+        self.has_picked_first = False
+
+    def compose(self) -> ComposeResult:
+        with Container(id="picker-container"):
+            # TOP 30% - Split vertically into 3 equal columns
+            yield RoleCard("baseline", "Baseline Coder", id="role-baseline", classes="active")
+            yield RoleCard("adversarial", "Adversary Coder", id="role-adversarial")
+            yield RoleCard("evaluator", "Evaluator Node", id="role-evaluator")
+            
+            # BOTTOM 70% - Search & OptionList
+            with Vertical(id="bottom-section"):
+                yield Input(placeholder="Search LiteLLM registry (e.g. gpt-4o, claude)...", id="model-search")
+                yield OptionList(id="model-list")
+                
+            # FOOTER - Action Buttons
+            with Horizontal(id="picker-actions"):
+                yield Button("Start Run", id="btn-start", variant="success")
+                yield Button("Cancel", id="btn-cancel", variant="error")
+
+    def on_mount(self) -> None:
+        self._populate_list("")
+        
+    def set_active_role(self, role_id: str):
+        self.active_role = role_id
+        for card in self.query(RoleCard):
+            if card.role_id == role_id:
+                card.add_class("active")
+            else:
+                card.remove_class("active")
+
+    def on_role_card_role_clicked(self, message: RoleCard.RoleClicked) -> None:
+        self.set_active_role(message.role_id)
+
+    def _populate_list(self, search_term: str) -> None:
+        option_list = self.query_one("#model-list", OptionList)
+        option_list.clear_options()
+        search_term = search_term.lower()
+        
+        options = []
+        for model_id, data in model_cost.items():
+            if search_term in model_id.lower():
+                cost = data.get('input_cost_per_token', 0)
+                max_tokens = data.get('max_tokens', 'Unknown')
+                # Rich formatting to look clean and present metadata
+                display = f"[bold]{model_id}[/bold] [dim italic]- Context: {max_tokens} | Cost/Token: ${cost:.6f}[/dim italic]"
+                options.append(Option(display, id=model_id))
+                
+        for opt in options:
+            option_list.add_option(opt)
+
+    def on_input_changed(self, message: Input.Changed) -> None:
+        """Trigger fuzzy search as the user types."""
+        self._populate_list(message.value)
+
+    def on_option_list_option_selected(self, message: OptionList.OptionSelected) -> None:
+        model_id = message.option_id
+        if not model_id:
+            return
+            
+        if not self.has_picked_first:
+            # First pick copies everywhere
+            self.model_selections["baseline"] = model_id
+            self.model_selections["adversarial"] = model_id
+            self.model_selections["evaluator"] = model_id
+            self.has_picked_first = True
+            
+            for card in self.query(RoleCard):
+                card.update_model(model_id)
+                
+            self.app.notify("Copied selection to all roles. Click another box to change them individually.", title="Models Assigned")
+            # Auto-advance focus to the next logical role
+            self.set_active_role("adversarial")
+        else:
+            self.model_selections[self.active_role] = model_id
+            for card in self.query(RoleCard):
+                if card.role_id == self.active_role:
+                    card.update_model(model_id)
+            self.app.notify(f"Assigned '{model_id}' to {self.active_role.title()}.", title="Model Assigned")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-start":
+            if any(v == "-NA-" for v in self.model_selections.values()):
+                self.app.notify("Please select models for all 3 roles before starting.", title="Incomplete", severity="error")
+                return
+            self.dismiss(self.model_selections)
+        elif event.button.id == "btn-cancel":
+            self.dismiss(None)

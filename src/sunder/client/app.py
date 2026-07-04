@@ -13,6 +13,7 @@ from sunder.knowledge.ingestion import IngestionEngine
 from sunder.client.hitl_search import TargetExplorerPane
 from sunder.client.config_panel import ConfigPanel
 from sunder.client.dashboard import TelemetryDashboard
+from sunder.client.model_picker import ModelPickerModal
 
 class SunderApp(App):
     """Sunder's primary LazyDocker-style TUI interface."""
@@ -184,7 +185,8 @@ class SunderApp(App):
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("tab", "app.focus_next", "Change Pane"),
-        ("s", "start_run", "Start Run")
+        ("s", "start_run", "Start Run"),
+        ("p", "pick_models", "Pick Models")
     ]
 
     def __init__(self):
@@ -192,6 +194,11 @@ class SunderApp(App):
         self.image_tag = None
         self.knowledge_db = None
         self.selected_target_id = None
+        self.llm_selections = {
+            "baseline": "-NA-",
+            "adversarial": "-NA-",
+            "evaluator": "-NA-"
+        }
 
     def on_mount(self) -> None:
         """Fires immediately when the UI is drawn to the terminal."""
@@ -246,32 +253,44 @@ class SunderApp(App):
             )   
 
     def action_start_run(self) -> None:
-        """Triggered via the [s] hotkey."""
-        if not self.selected_target_id:
-            self.notify("Please select a target function first.", title="Error", severity="error")
-            return
-            
-        config_panel = self.query_one(ConfigPanel)
-        mode = config_panel.get_current_mode()
-        profile = config_panel.get_sandbox_profile(custom_image=self.image_tag)
-        
-        # Grab the dashboard and use its API
-        dashboard = self.query_one(TelemetryDashboard)
-        dashboard.clear_agent()
-        
-        # Switch the UI back to the telemetry tab automatically when a run starts
-        tabs = self.query_one("TabbedContent")
-        tabs.active = "tab-telemetry"
+        """Triggered via the [s] hotkey. Intercepts the run to open the Model Picker."""
 
-        dashboard.write_agent(f"[bold green]Initiating LangGraph Orchestrator...[/bold green]")
-        dashboard.write_agent(f"Mode: [cyan]{mode.value}[/cyan]")
-        dashboard.write_agent(f"Network: [cyan]{profile.network_mode.value}[/cyan]")
-        dashboard.write_agent(f"Limits: RAM={profile.memory_limit}, CPU={profile.cpu_quota}, Timeout={profile.timeout_seconds}s")
-        dashboard.write_agent(f"Injected Env Vars: {len(profile.environment_vars)}")
-        
-        self.notify(f"Starting {mode.value} execution loop...", title="Run Started")
-        
-        # PHASE 2 TODO: Call Orchestrator passing the selected target and profile schemas.
+        def on_models_picked(selections: dict | None):
+            if not selections:
+                return # User cancelled the modal
+            
+            # Store selections for Orchestrator processing
+            self.llm_selections = selections
+            
+            config_panel = self.query_one(ConfigPanel)
+            mode = config_panel.get_current_mode()
+            profile = config_panel.get_sandbox_profile(custom_image=self.image_tag)
+            
+            dashboard = self.query_one(TelemetryDashboard)
+            dashboard.clear_agent()
+            
+            tabs = self.query_one("TabbedContent")
+            tabs.active = "tab-telemetry"
+
+            dashboard.write_agent(f"[bold green]Initiating LangGraph Orchestrator...[/bold green]")
+            dashboard.write_agent(f"Mode: [cyan]{mode.value}[/cyan]")
+            
+            # Log the LiteLLM Model choices
+            dashboard.write_agent(f"Baseline Coder: [yellow]{self.llm_selections['baseline']}[/yellow]")
+            dashboard.write_agent(f"Adversary Coder: [yellow]{self.llm_selections['adversarial']}[/yellow]")
+            dashboard.write_agent(f"Evaluator Node: [yellow]{self.llm_selections['evaluator']}[/yellow]")
+            dashboard.write_agent("---")
+            
+            dashboard.write_agent(f"Network: [cyan]{profile.network_mode.value}[/cyan]")
+            dashboard.write_agent(f"Limits: RAM={profile.memory_limit}, CPU={profile.cpu_quota}, Timeout={profile.timeout_seconds}s")
+            dashboard.write_agent(f"Injected Env Vars: {len(profile.environment_vars)}\n")
+            
+            self.notify(f"Starting {mode.value} execution loop...", title="Run Started")
+            
+            # PHASE 2 TODO: Call Orchestrator here passing models & config.
+
+        # Push the modal and wait for user to configure models
+        self.app.push_screen(ModelPickerModal(), on_models_picked)
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
