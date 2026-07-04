@@ -94,66 +94,11 @@ class SunderApp(App):
         text-style: bold;
     }
 
-    /* --- TELEMETRY DASHBOARD OVERRIDES --- */
-    #workspace-column { 
-        height: 100%; 
-        padding: 1; 
-    }
-    
-    TelemetryDashboard {
-        height: 100%;
-        width: 100%;
-    }
-    
-    TelemetryDashboard > TabbedContent { 
-        height: 100%; 
-    }
-    
-    ContentTabs {
-        height: 3;
-        margin-bottom: 0;
-        background: transparent; 
-    }
-
-    ContentSwitcher {
-        height: 1fr;
-    }
-
-    TabPane {
-        height: 100%;
-        padding: 0; 
-    }
-
-    #context-scroll-container {
-        padding: 0;
-        margin: 0;
-        height: 100%;
-    }
-
-    TabbedContent { 
-        height: 100%; 
-        margin: 0; 
-        padding: 0; 
-    }
-    
-    TabbedContent > ContentTabs { 
-        height: 3; 
-        margin: 0; 
-        padding: 0; 
-        background: transparent;
-    }
-    
-    TabbedContent > ContentSwitcher { 
-        height: 1fr; 
-        padding: 0; 
-        margin: 0;
-    }
-    
-    TabPane { 
-        height: 100%; 
-        padding: 0; 
-        margin: 0;
-    }
+    /* --- TABBED CONTENT CLEANUP --- */
+    TabbedContent { height: 100%; margin: 0; padding: 0; }
+    TabbedContent > ContentTabs { height: 3; margin: 0; padding: 0; background: transparent; }
+    TabbedContent > ContentSwitcher { height: 1fr; padding: 0; margin: 0; }
+    TabPane { height: 100%; padding: 0; margin: 0; }
     
     #context-viewer { 
         height: 100%; 
@@ -162,31 +107,33 @@ class SunderApp(App):
         margin: 0;
         overflow-y: auto; 
     }
-    
-    #telemetry-grid {
-        layout: grid; 
-        grid-size: 2 1; 
-        grid-columns: 1fr 1fr; 
-        height: 100%;
+
+    /* --- TELEMETRY --- */
+    #workspace-column { 
+        height: 100%; 
+        padding: 0; 
     }
-    
+    TelemetryDashboard {
+        height: 100%;
+        width: 100%;
+    }
+    #telemetry-grid {
+        layout: grid; grid-size: 2 1; grid-columns: 1fr 1fr; height: 100%;
+    }
     #telemetry-grid RichLog { 
         border: round $border-color; 
         height: 100%; 
         background: transparent; 
         margin: 0 0; 
     }
-    
-    #telemetry-grid RichLog:focus { 
-        border: round $focus-border-color; 
-    }
+    #telemetry-grid RichLog:focus { border: round $focus-border-color; }
     """
 
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("tab", "app.focus_next", "Change Pane"),
         ("s", "start_run", "Start Run"),
-        ("p", "pick_models", "Pick Models")
+        ("p", "pick_models", "Pick Models") 
     ]
 
     def __init__(self):
@@ -194,6 +141,7 @@ class SunderApp(App):
         self.image_tag = None
         self.knowledge_db = None
         self.selected_target_id = None
+        
         self.llm_selections = {
             "baseline": "-NA-",
             "adversarial": "-NA-",
@@ -250,47 +198,51 @@ class SunderApp(App):
                 source_code=target_node.source_code, 
                 language=target_node.language, 
                 header_text=header
-            )   
+            )
+            self.notify(f"Target selected: {target_node.symbol_name}", title="Target Selected")
+
+    def action_pick_models(self) -> None:
+        """Triggered via the [p] hotkey to open the Model Palette."""
+        def update_models(new_selections: dict | None):
+            if new_selections:
+                self.llm_selections = new_selections
+                self.notify("Orchestrator LLMs updated.", title="Models Saved", severity="information")
+
+        # Push the modal onto the screen and pass it the current selections
+        self.app.push_screen(ModelPickerModal(self.llm_selections), update_models)
 
     def action_start_run(self) -> None:
-        """Triggered via the [s] hotkey. Intercepts the run to open the Model Picker."""
+        """Triggered via the [s] hotkey. Instantly starts the run."""
+        if not self.selected_target_id:
+            self.notify("Please select a target function first.", title="Error", severity="error")
+            return
+            
+        config_panel = self.query_one(ConfigPanel)
+        mode = config_panel.get_current_mode()
+        profile = config_panel.get_sandbox_profile(custom_image=self.image_tag)
+        
+        dashboard = self.query_one(TelemetryDashboard)
+        dashboard.clear_agent()
+        
+        tabs = self.query_one("TabbedContent")
+        tabs.active = "tab-telemetry"
 
-        def on_models_picked(selections: dict | None):
-            if not selections:
-                return # User cancelled the modal
-            
-            # Store selections for Orchestrator processing
-            self.llm_selections = selections
-            
-            config_panel = self.query_one(ConfigPanel)
-            mode = config_panel.get_current_mode()
-            profile = config_panel.get_sandbox_profile(custom_image=self.image_tag)
-            
-            dashboard = self.query_one(TelemetryDashboard)
-            dashboard.clear_agent()
-            
-            tabs = self.query_one("TabbedContent")
-            tabs.active = "tab-telemetry"
-
-            dashboard.write_agent(f"[bold green]Initiating LangGraph Orchestrator...[/bold green]")
-            dashboard.write_agent(f"Mode: [cyan]{mode.value}[/cyan]")
-            
-            # Log the LiteLLM Model choices
-            dashboard.write_agent(f"Baseline Coder: [yellow]{self.llm_selections['baseline']}[/yellow]")
-            dashboard.write_agent(f"Adversary Coder: [yellow]{self.llm_selections['adversarial']}[/yellow]")
-            dashboard.write_agent(f"Evaluator Node: [yellow]{self.llm_selections['evaluator']}[/yellow]")
-            dashboard.write_agent("---")
-            
-            dashboard.write_agent(f"Network: [cyan]{profile.network_mode.value}[/cyan]")
-            dashboard.write_agent(f"Limits: RAM={profile.memory_limit}, CPU={profile.cpu_quota}, Timeout={profile.timeout_seconds}s")
-            dashboard.write_agent(f"Injected Env Vars: {len(profile.environment_vars)}\n")
-            
-            self.notify(f"Starting {mode.value} execution loop...", title="Run Started")
-            
-            # PHASE 2 TODO: Call Orchestrator here passing models & config.
-
-        # Push the modal and wait for user to configure models
-        self.app.push_screen(ModelPickerModal(), on_models_picked)
+        dashboard.write_agent(f"[bold green]Initiating LangGraph Orchestrator...[/bold green]")
+        dashboard.write_agent(f"Mode: [cyan]{mode.value}[/cyan]")
+        
+        # Log the LiteLLM Model choices
+        dashboard.write_agent(f"Baseline Coder: [yellow]{self.llm_selections['baseline']}[/yellow]")
+        dashboard.write_agent(f"Adversary Coder: [yellow]{self.llm_selections['adversarial']}[/yellow]")
+        dashboard.write_agent(f"Evaluator Node: [yellow]{self.llm_selections['evaluator']}[/yellow]")
+        dashboard.write_agent("---")
+        
+        dashboard.write_agent(f"Network: [cyan]{profile.network_mode.value}[/cyan]")
+        dashboard.write_agent(f"Limits: RAM={profile.memory_limit}, CPU={profile.cpu_quota}, Timeout={profile.timeout_seconds}s")
+        dashboard.write_agent(f"Injected Env Vars: {len(profile.environment_vars)}\n")
+        
+        self.notify(f"Starting {mode.value} execution loop...", title="Run Started")
+        
+        # PHASE 2 TODO: Call Orchestrator passing the selected target and profile schemas.
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)

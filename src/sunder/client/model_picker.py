@@ -62,7 +62,6 @@ class ModelPickerModal(ModalScreen[dict]):
         layout: grid;
         grid-size: 3 3; 
         grid-columns: 1fr 1fr 1fr;
-        /* Top 30%, Middle 70%, Bottom row for buttons */
         grid-rows: 30% 1fr 3;
     }
     
@@ -77,7 +76,7 @@ class ModelPickerModal(ModalScreen[dict]):
         background: #333333;
     }
     RoleCard.active {
-        border: round #00ff00; /* Highlight active role */
+        border: round #00ff00; 
     }
     
     #bottom-section {
@@ -113,9 +112,9 @@ class ModelPickerModal(ModalScreen[dict]):
     #picker-actions Button { margin-left: 1; }
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, current_selections: dict = None, **kwargs):
         super().__init__(**kwargs)
-        self.model_selections = {
+        self.model_selections = current_selections.copy() if current_selections else {
             "baseline": "-NA-",
             "adversarial": "-NA-",
             "evaluator": "-NA-"
@@ -125,23 +124,26 @@ class ModelPickerModal(ModalScreen[dict]):
 
     def compose(self) -> ComposeResult:
         with Container(id="picker-container"):
-            # TOP 30% - Split vertically into 3 equal columns
             yield RoleCard("baseline", "Baseline Coder", id="role-baseline", classes="active")
             yield RoleCard("adversarial", "Adversary Coder", id="role-adversarial")
             yield RoleCard("evaluator", "Evaluator Node", id="role-evaluator")
             
-            # BOTTOM 70% - Search & OptionList
             with Vertical(id="bottom-section"):
                 yield Input(placeholder="Search LiteLLM registry (e.g. gpt-4o, claude)...", id="model-search")
                 yield OptionList(id="model-list")
                 
-            # FOOTER - Action Buttons
             with Horizontal(id="picker-actions"):
-                yield Button("Start Run", id="btn-start", variant="success")
+                yield Button("Save & Close", id="btn-start", variant="success")
                 yield Button("Cancel", id="btn-cancel", variant="error")
 
     def on_mount(self) -> None:
         self._populate_list("")
+        # Pre-populate the cards if there are existing selections passed from app.py
+        for role_id, model_id in self.model_selections.items():
+            if model_id != "-NA-":
+                for card in self.query(RoleCard):
+                    if card.role_id == role_id:
+                        card.update_model(model_id)
         
     def set_active_role(self, role_id: str):
         self.active_role = role_id
@@ -164,7 +166,6 @@ class ModelPickerModal(ModalScreen[dict]):
             if search_term in model_id.lower():
                 cost = data.get('input_cost_per_token', 0)
                 max_tokens = data.get('max_tokens', 'Unknown')
-                # Rich formatting to look clean and present metadata
                 display = f"[bold]{model_id}[/bold] [dim italic]- Context: {max_tokens} | Cost/Token: ${cost:.6f}[/dim italic]"
                 options.append(Option(display, id=model_id))
                 
@@ -198,12 +199,11 @@ class ModelPickerModal(ModalScreen[dict]):
             for card in self.query(RoleCard):
                 if card.role_id == self.active_role:
                     card.update_model(model_id)
-            self.app.notify(f"Assigned '{model_id}' to {self.active_role.title()}.", title="Model Assigned")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-start":
             if any(v == "-NA-" for v in self.model_selections.values()):
-                self.app.notify("Please select models for all 3 roles before starting.", title="Incomplete", severity="error")
+                self.app.notify("Please select models for all 3 roles before saving.", title="Incomplete", severity="error")
                 return
             self.dismiss(self.model_selections)
         elif event.button.id == "btn-cancel":
