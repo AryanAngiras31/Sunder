@@ -19,6 +19,7 @@ from sunder.client.model_picker import ModelPickerModal
 from langchain.chat_models import init_chat_model
 from sunder.orchestration.orchestrator import SunderOrchestrator
 from sunder.schema import SunderAgentState, BlastRadiusContext, EnvironmentState
+from langchain_openai import ChatOpenAI
 
 class SunderApp(App):
     """Sunder's primary LazyDocker-style TUI interface."""
@@ -260,12 +261,34 @@ class SunderApp(App):
         # 4. Initialize LLMs & Orchestrator
         try:
             def create_llm(model_id: str, temperature: float):
-                # Safely handle LiteLLM strings whether they have a provider prefix or not
                 if "/" in model_id:
                     provider, model_name = model_id.split("/", 1)
-                    return init_chat_model(model=model_name, model_provider=provider, temperature=temperature)
                 else:
-                    return init_chat_model(model=model_id, temperature=temperature)
+                    provider, model_name = "unknown", model_id
+
+                # 1. Route OpenRouter through the OpenAI Universal API
+                if provider == "openrouter":
+                    return ChatOpenAI(
+                        model=model_id, 
+                        # Look for a custom URL, otherwise default to the public API
+                        base_url=os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"), 
+                        api_key=os.environ.get("OPENROUTER_API_KEY", "missing_key"),
+                        temperature=temperature
+                    )
+                    
+                # 2. Route Ollama through the OpenAI Universal API for guaranteed structured output support
+                elif provider == "ollama":
+                    return ChatOpenAI(
+                        model=model_name,
+                        # Look for a remote/custom Ollama URL, otherwise default to localhost
+                        base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+                        api_key="ollama", 
+                        temperature=temperature
+                    )
+                    
+                # 3. Let LangChain natively handle standard providers (openai, anthropic, google_genai, etc.)
+                else:
+                    return init_chat_model(model=model_name, model_provider=provider, temperature=temperature)
 
             baseline_llm = create_llm(self.llm_selections['baseline'], 0.2)
             adversary_llm = create_llm(self.llm_selections['adversarial'], 0.7)
