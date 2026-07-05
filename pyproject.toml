@@ -15,7 +15,8 @@ dependencies = [
     "tree-sitter-languages==1.10.2",
     "textual==8.2.8",
     "litellm==1.90.3",
-    "langchain-openai==1.3.3"
+    "langchain-openai==1.3.3",
+    "langchain-google-genai==4.2.6"
 ]
 
 [project.scripts]

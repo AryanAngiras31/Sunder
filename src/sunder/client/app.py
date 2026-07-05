@@ -3,6 +3,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.widgets import Header, Footer
+from dotenv import load_dotenv
 
 # Sunder Core Imports
 from sunder.execution.bootstrapper import Bootstrapper
@@ -154,6 +155,10 @@ class SunderApp(App):
             "evaluator": "-NA-"
         }
 
+        env_path = os.path.join(os.getcwd(), ".sunder", ".env")
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+
     def on_mount(self) -> None:
         """Fires immediately when the UI is drawn to the terminal."""
         self.notify("Starting Bootstrapper & Ingestion Engine...", title="Sunder Startup")
@@ -265,6 +270,15 @@ class SunderApp(App):
                     provider, model_name = model_id.split("/", 1)
                 else:
                     provider, model_name = "unknown", model_id
+
+                provider_map = {
+                    "gemini": "google_genai",
+                    "vertex_ai": "google_vertexai",
+                    "azure": "azure_openai",
+                    "mistral": "mistralai",
+                    "together_ai": "together"
+                }
+                provider = provider_map.get(provider, provider)
 
                 # 1. Route OpenRouter through the OpenAI Universal API
                 if provider == "openrouter":

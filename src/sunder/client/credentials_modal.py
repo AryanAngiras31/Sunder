@@ -34,25 +34,20 @@ class CredentialsModal(ModalScreen[bool]):
             # Create masked inputs for the top providers
             providers = [
                 ("OpenAI", "OPENAI_API_KEY"),
-                ("Anthropic", "ANTHROPIC_API_KEY"),
                 ("OpenRouter", "OPENROUTER_API_KEY"),
                 ("Google Gemini", "GEMINI_API_KEY"),
                 ("Groq", "GROQ_API_KEY"),
                 ("Mistral AI", "MISTRAL_API_KEY"),
                 ("Cohere", "COHERE_API_KEY"),
-                ("Together AI", "TOGETHER_API_KEY"),
-                ("Fireworks AI", "FIREWORKS_API_KEY"),
-                ("HuggingFace", "HF_TOKEN"),
-                ("Azure OpenAI", "AZURE_OPENAI_API_KEY"),
+                ("Together AI", "TOGETHER_API_KEY")
             ]
-            
-            with VerticalScroll():
-                for name, env_key in providers:
-                    with Horizontal(classes="cred-row"):
-                        yield Label(name)
-                        # Pre-fill with existing key if it exists, but mask it
-                        existing = os.environ.get(env_key, "")
-                        yield Input(value=existing, password=True, id=env_key, placeholder=f"Enter {name} key...")
+        
+            for name, env_key in providers:
+                with Horizontal(classes="cred-row"):
+                    yield Label(name)
+                    # Pre-fill with existing key if it exists, but mask it
+                    existing = os.environ.get(env_key, "")
+                    yield Input(value=existing, password=True, id=env_key, placeholder=f"Enter {name} key...")
 
             with Horizontal(id="cred-actions"):
                 yield Button("Save Keys", id="btn-save", variant="success")
@@ -60,8 +55,11 @@ class CredentialsModal(ModalScreen[bool]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-save":
-            # 1. Ensure .env file exists
-            env_path = os.path.join(os.getcwd(), ".sunder/.env")
+            # 1. Ensure .sunder directory and .env file exist safely
+            sunder_dir = os.path.join(os.getcwd(), ".sunder")
+            os.makedirs(sunder_dir, exist_ok=True) # Creates the folder if missing
+            
+            env_path = os.path.join(sunder_dir, ".env")
             if not os.path.exists(env_path):
                 open(env_path, 'a').close()
 
@@ -72,6 +70,9 @@ class CredentialsModal(ModalScreen[bool]):
                 if val:
                     os.environ[key] = val
                     dotenv.set_key(env_path, key, val)
+                else:
+                    os.environ.pop(key, None)
+                    dotenv.unset_key(env_path, key)
             
             self.app.notify("API Keys saved to .env", title="Credentials Updated")
             self.dismiss(True) # Return True to indicate keys changed
