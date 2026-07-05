@@ -4,6 +4,8 @@ from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.widgets import Header, Footer
 from dotenv import load_dotenv
+from rich.syntax import Syntax
+from rich.text import Text
 
 # Sunder Core Imports
 from sunder.execution.bootstrapper import Bootstrapper
@@ -341,31 +343,57 @@ class SunderApp(App):
 
     @work
     async def run_orchestration_loop(self, graph, initial_state: SunderAgentState) -> None:
-        """Runs the compiled LangGraph asynchronously to prevent UI freezing."""
+        """Runs the compiled LangGraph asynchronously and routes telemetry cleanly."""
         dashboard = self.query_one(TelemetryDashboard)
         try:
-            # LangGraph's astream yields dicts containing updates from each node as they complete
             async for output in graph.astream(initial_state):
                 for node_name, state_update in output.items():
-                    dashboard.write_agent(f"\n[bold magenta]>[/bold magenta] Node [cyan]{node_name}[/cyan] completed.")
+                    # --- 1. AGENT LOG: Node Transition ---
+                    dashboard.write_agent(f"\n[bold magenta]▶[/bold magenta] [bold]Node:[/bold] [cyan]{node_name}[/cyan]")
                     
-                    # Log interesting parts of the state update safely
+                    # --- 2. CODER NODES: Script Generation ---
                     if "current_test_script" in state_update:
-                        dashboard.write_agent(f"Generated payload (length: {len(state_update['current_test_script'])} chars)")
+                        script = state_update["current_test_script"]
+                        dashboard.write_agent(f"  └─ Generated payload (length: {len(script)} chars)")
                         
+                        # Sandbox Log: Syntax highlighted injection
+                        dashboard.write_sandbox(f"\n[bold blue]--- INJECTED PAYLOAD ({node_name}) ---[/bold blue]")
+                        # Pass syntax block directly to avoid rich markup injection errors
+                        dashboard.write_sandbox(Syntax(script, lexer="python", theme="monokai", word_wrap=True))
+                        
+                    # --- 3. EXECUTOR NODE: Execution Report ---
                     if "execution_report" in state_update:
                         report = state_update["execution_report"]
                         color = "green" if report.exit_code == 0 else "red"
-                        dashboard.write_agent(f"Sandbox Exit Code: [bold {color}]{report.exit_code}[/bold {color}]")
+                        
+                        dashboard.write_agent(f"  └─ Execution finished. Exit Code: [bold {color}]{report.exit_code}[/bold {color}]")
+                        
+                        # Sandbox Log: Environment Outputs
+                        dashboard.write_sandbox(f"\n[bold {color}]--- EXECUTION REPORT ---[/bold {color}]")
+                        dashboard.write_sandbox(f"Exit Code: {report.exit_code}")
+                        
+                        if report.stdout:
+                            dashboard.write_sandbox("\n[bold]STDOUT:[/bold]")
+                            # Wrap in rich.text.Text so random brackets in stdout don't crash markup
+                            dashboard.write_sandbox(Text(report.stdout))
+                            
+                        if report.stderr:
+                            dashboard.write_sandbox("\n[bold red]STDERR:[/bold red]")
+                            dashboard.write_sandbox(Text(report.stderr, style="red"))
+                            
+                    # --- 4. EVALUATOR NODE: Feedback & Verdict ---
+                    if "evaluator_feedback" in state_update:
+                        dashboard.write_agent(f"  ├─ [bold]Evaluator Feedback:[/bold]")
+                        dashboard.write_agent(f"  │  [italic]{state_update['evaluator_feedback']}[/italic]")
                         
                     if "final_verdict" in state_update:
                         verdict = state_update["final_verdict"]
-                        dashboard.write_agent(f"Evaluator Verdict: [bold yellow]{verdict.value}[/bold yellow]")
-                        
-                    if "evaluator_feedback" in state_update:
-                        dashboard.write_agent(f"Feedback: [dim]{state_update['evaluator_feedback']}[/dim]")
+                        # Give secure results green text, vulnerabilities red/yellow
+                        v_color = "bold green" if "SECURE" in verdict.name else "bold red"
+                        dashboard.write_agent(f"  └─ [bold]Verdict:[/bold] [{v_color}]{verdict.value}[/{v_color}]")
                         
             dashboard.write_agent(f"\n[bold green]Run Completed.[/bold green]")
+            dashboard.write_sandbox(f"\n[bold green]Container Terminated.[/bold green]")
             self.notify("Orchestration loop finished.", title="Run Complete", severity="information")
             
         except Exception as e:

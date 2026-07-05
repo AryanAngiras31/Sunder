@@ -23,13 +23,13 @@ class TelemetryDashboard(Static):
             with TabPane("Live Telemetry", id="tab-telemetry"):
                 with Grid(id="telemetry-grid"):
                     yield RichLog(id="agent-workspace", highlight=True, markup=True)
-                    yield RichLog(id="docker-sandbox", highlight=True)
+                    yield RichLog(id="docker-sandbox", highlight=True, markup=True)
             
             # Tab 3: Execution Report
             with TabPane("Execution Report", id="tab-report"):
                 yield Static("Verdict, JWTs, Mock IDs, and Stats.", id="report-viewer")
 
-    def write_agent(self, text: str) -> None:
+    def write_agent(self, text) -> None:
         """Write to the left-hand Agent Workspace log."""
         try:
             log = self.query_one("#agent-workspace", RichLog)
@@ -44,20 +44,25 @@ class TelemetryDashboard(Static):
         except Exception:
             pass
 
-    def write_sandbox(self, text: str) -> None:
-        """Write to the right-hand Docker Sandbox log."""
+    def write_sandbox(self, content) -> None:
+        """Write to the right-hand Docker Sandbox log. Accepts strings or Rich renderables."""
         try:
             log = self.query_one("#docker-sandbox", RichLog)
-            log.write(text)
+            log.write(content)
         except Exception as e:
             logger.error(f"Failed to write to sandbox log: {e}")
+            
+    def clear_sandbox(self) -> None:
+        """Clear the right-hand Docker Sandbox log."""
+        try:
+            self.query_one("#docker-sandbox", RichLog).clear()
+        except Exception:
+            pass
 
     def update_context(self, source_code: str, language: str, header_text: str) -> None:
         """Update the Code Context tab with syntax-highlighted source code."""
         try:
-            # Explicitly query the Static widget, not the scroll view
             viewer = self.query_one("#context-viewer", Static)
-            
             syntax_block = Syntax(
                 source_code, 
                 lexer=language, 
@@ -66,18 +71,13 @@ class TelemetryDashboard(Static):
                 word_wrap=True,
                 background_color="default" 
             )
-            
-            # Safely group the header text and the highlighted code
             header = Text.from_markup(header_text)
             viewer.update(Group(header, syntax_block))
             
-            # Automatically switch to the context tab
             tabs = self.query_one(TabbedContent)
             tabs.active = "tab-context"
             
-            # Auto-scroll to the top of the new code block
             scroll_container = self.query_one("#context-scroll-container", VerticalScroll)
             scroll_container.scroll_to(0, 0)
-            
         except Exception as e:
             logger.error(f"Failed to update context viewer: {e}")
