@@ -5,9 +5,8 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import Input, OptionList, Button, Static
 from textual.widgets.option_list import Option
 from textual.message import Message
-
 from litellm import model_cost
-
+from sunder.client.credentials_modal import CredentialsModal
 
 logger = logging.getLogger(__name__)
 
@@ -122,12 +121,13 @@ class ModelPickerModal(ModalScreen[dict]):
             yield RoleCard("evaluator", "Evaluator Node", id="role-evaluator")
             
             with Vertical(id="bottom-section"):
-                yield Input(placeholder="Search LiteLLM registry", id="model-search")
+                yield Input(placeholder="Search Model Registry", id="model-search")
                 yield OptionList(id="model-list")
-                
+
             with Horizontal(id="picker-actions"):
-                yield Button("Save & Close", id="btn-start", variant="success")
-                yield Button("Cancel", id="btn-cancel", variant="error")
+                    yield Button("Manage API Keys", id="btn-keys", variant="primary") 
+                    yield Button("Save & Close", id="btn-start", variant="success")
+                    yield Button("Cancel", id="btn-cancel", variant="error")
 
     def on_mount(self) -> None:
         self._populate_list("")
@@ -165,6 +165,10 @@ class ModelPickerModal(ModalScreen[dict]):
             available.add("groq")
         if os.environ.get("MISTRAL_API_KEY"):
             available.add("mistral")
+        if os.environ.get("COHERE_API_KEY"):
+            available.add("cohere")
+        if os.environ.get("TOGETHER_API_KEY"):
+            available.add("together_ai")
         if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
             available.update(["gemini", "vertex_ai"])
             
@@ -224,7 +228,13 @@ class ModelPickerModal(ModalScreen[dict]):
                     card.update_model(model_id)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-start":
+        if event.button.id == "btn-keys":
+            def on_keys_closed(keys_changed: bool):
+                if keys_changed:
+                    self._populate_list(self.query_one("#model-search", Input).value)
+            
+            self.app.push_screen(CredentialsModal(), on_keys_closed)
+        elif event.button.id == "btn-start":
             if any(v == "-NA-" for v in self.model_selections.values()):
                 self.app.notify("Please select models for all 3 roles before saving.", title="Incomplete", severity="error")
                 return
