@@ -39,7 +39,8 @@ class CredentialsModal(ModalScreen[bool]):
                 ("Groq", "GROQ_API_KEY"),
                 ("Mistral AI", "MISTRAL_API_KEY"),
                 ("Cohere", "COHERE_API_KEY"),
-                ("Together AI", "TOGETHER_API_KEY")
+                ("Together AI", "TOGETHER_API_KEY"),
+                ("DeepSeek", "DEEPSEEK_API_KEY")
             ]
         
             for name, env_key in providers:

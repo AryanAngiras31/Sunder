@@ -157,8 +157,6 @@ class ModelPickerModal(ModalScreen[dict]):
         
         if os.environ.get("OPENAI_API_KEY"):
             available.add("openai")
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            available.add("anthropic")
         if os.environ.get("OPENROUTER_API_KEY"):
             available.add("openrouter")
         if os.environ.get("GROQ_API_KEY"):
@@ -171,6 +169,8 @@ class ModelPickerModal(ModalScreen[dict]):
             available.add("together_ai")
         if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
             available.update(["gemini", "vertex_ai"])
+        if os.environ.get("DEEPSEEK_API_KEY"):
+            available.add("deepseek")
             
         return available
 
