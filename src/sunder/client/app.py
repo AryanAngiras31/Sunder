@@ -131,11 +131,43 @@ class SunderApp(App):
     }
     #telemetry-grid RichLog { 
         border: round $border-color; 
-        height: 100%; 
+        height: 100%;
         background: transparent; 
         margin: 0 0; 
     }
     #telemetry-grid RichLog:focus { border: round $focus-border-color; }
+
+    /* --- GLOBAL BUTTON STYLING --- */
+    
+    /* Target all variant="success" buttons */
+    Button.-success {
+        background: $surface-color;
+        border: round $focus-border-color;
+        color: $text-primary;
+    }
+
+    /* Target all variant="error" buttons */
+    Button.-error {
+        background: $surface-color;
+        border: round $border-color;
+        color: $text-primary;
+    }
+
+    #picker-actions Button:focus {
+        background: $surface-color;
+        color: $text-primary;
+        text-style: none; 
+    }
+    
+    #picker-actions Button.-success:focus {
+        background: transparent;
+        border: round $focus-border-color;
+    }
+    
+    #picker-actions Button.-error:focus {
+        background: transparent;
+        border: round $border-color;
+    }
     """
 
     BINDINGS = [

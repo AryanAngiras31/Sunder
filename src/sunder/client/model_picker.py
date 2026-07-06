@@ -98,12 +98,20 @@ class ModelPickerModal(ModalScreen[dict]):
     
     #picker-actions {
         column-span: 3;
-        align: right middle;
+        layout: horizontal;
         height: 3;
         margin-top: 0;
-        padding-right: 0;
+        width: 100%;
     }
-    #picker-actions Button { margin-left: 0; }
+
+    #btn-cancel {
+        margin-left: 1;
+    }
+
+    #action-spacer {
+        width: 1fr;
+        background: transparent;
+    }
     """
 
     def __init__(self, current_selections: dict = None, **kwargs):
@@ -127,7 +135,10 @@ class ModelPickerModal(ModalScreen[dict]):
                 yield OptionList(id="model-list")
 
             with Horizontal(id="picker-actions"):
-                    yield Button("Manage API Keys", id="btn-keys", variant="primary") 
+                    yield Button("Manage API Keys", id="btn-keys", variant="success") 
+
+                    yield Static(id="action-spacer")
+
                     yield Button("Save & Close", id="btn-start", variant="success")
                     yield Button("Cancel", id="btn-cancel", variant="error")
 
