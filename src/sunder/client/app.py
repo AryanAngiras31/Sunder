@@ -31,8 +31,8 @@ class SunderApp(App):
     SUB_TITLE = "Zero-Trust Agentic Fuzzer"
 
     CSS = """
-    $border-color: #5a5a5a;
-    $focus-border-color: #00ff00;
+    $border-color: #2B2B2B;
+    $focus-border-color: #82BDBD;
     $text-primary: #e0e0e0;
     $accent-color: #00ffff;
 
@@ -60,7 +60,7 @@ class SunderApp(App):
     }
     .pane:focus-within { border: round $focus-border-color; }
     .pane-title {
-        color: $accent-color; text-style: bold;
+        color: $text-primary; text-style: bold;
         margin-bottom: 1; content-align: center middle; width: 100%;
     }
     #target-explorer Input { margin-bottom: 1; }
@@ -95,7 +95,7 @@ class SunderApp(App):
     #env-var-btn {
         width: 100%;
         height: 3;
-        color: $accent-color;
+        color: $text-primary;
         content-align: center middle;
     }
     #env-var-btn:hover, #env-var-btn:focus {
@@ -359,7 +359,25 @@ class SunderApp(App):
                         # Sandbox Log: Syntax highlighted injection
                         dashboard.write_sandbox(f"\n[bold blue]--- INJECTED PAYLOAD ({node_name}) ---[/bold blue]")
                         # Pass syntax block directly to avoid rich markup injection errors
-                        dashboard.write_sandbox(Syntax(script, lexer="python", theme="monokai", word_wrap=True))
+                        try: 
+                            enhanced_script = Syntax(
+                                script, 
+                                lexer=self.selected_target_node.language, 
+                                theme="monokai", 
+                                word_wrap=True, 
+                                tab_size=2, 
+                                line_numbers=True
+                            )
+                        except ClassNotFound:
+                            enhanced_script = Syntax(
+                                script, 
+                                lexer='text', 
+                                theme="monokai", 
+                                word_wrap=True, 
+                                tab_size=2, 
+                                line_numbers=True
+                            )
+                        dashboard.write_sandbox(enhanced_script)
                         
                     # --- 3. EXECUTOR NODE: Execution Report ---
                     if "execution_report" in state_update:

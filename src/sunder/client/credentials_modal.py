@@ -18,13 +18,13 @@ class CredentialsModal(ModalScreen[bool]):
         height: auto;
         background: #1e1e1e;
         border: round #00ffff;
-        padding: 1 2;
+        padding: 0 0;
     }
-    .cred-row { height: 3; margin-bottom: 1; }
+    .cred-row { height: 3; margin-bottom: 0; }
     .cred-row Label { width: 20%; content-align: left middle; height: 100%; color: #00ffff; }
     .cred-row Input { width: 80%; }
-    #cred-actions { height: 3; align: right middle; margin-top: 1;}
-    #cred-actions Button { margin-left: 1; }
+    #cred-actions { height: 3; align: right middle; margin-top: 0;}
+    #cred-actions Button { margin-left: 0; }
     """
 
     def compose(self) -> ComposeResult:

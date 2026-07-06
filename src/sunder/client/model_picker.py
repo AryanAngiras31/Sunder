@@ -50,7 +50,7 @@ class ModelPickerModal(ModalScreen[dict]):
         height: 85%;
         background: #1e1e1e;
         border: round #00ffff;
-        padding: 1 2;
+        padding: 0 0;
         layout: grid;
         grid-size: 3 3; 
         grid-columns: 1fr 1fr 1fr;
@@ -62,7 +62,7 @@ class ModelPickerModal(ModalScreen[dict]):
         background: #2a2a2a;
         content-align: center middle;
         height: 100%;
-        margin: 0 1;
+        margin: 0 0;
     }
     RoleCard:hover {
         background: #333333;
@@ -75,15 +75,15 @@ class ModelPickerModal(ModalScreen[dict]):
         column-span: 3;
         layout: vertical;
         height: 100%;
-        margin-top: 1;
-        padding: 0 1;
+        margin-top: 0;
+        padding: 0 0;
     }
     
     #model-search {
         height: 3;
         border: round #5a5a5a;
         background: #2a2a2a;
-        margin-bottom: 1;
+        margin-bottom: 0;
     }
     #model-search:focus { border: round #00ff00; }
     
@@ -98,10 +98,10 @@ class ModelPickerModal(ModalScreen[dict]):
         column-span: 3;
         align: right middle;
         height: 3;
-        margin-top: 1;
-        padding-right: 1;
+        margin-top: 0;
+        padding-right: 0;
     }
-    #picker-actions Button { margin-left: 1; }
+    #picker-actions Button { margin-left: 0; }
     """
 
     def __init__(self, current_selections: dict = None, **kwargs):

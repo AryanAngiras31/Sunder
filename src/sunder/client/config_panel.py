@@ -19,7 +19,7 @@ class EnvVarModal(ModalScreen[dict]):
         width: 60%;
         height: 60%;
         background: #1e1e1e;
-        border: round #5a5a5a;
+        border: round #2B2B2B;
         padding: 1 2;
     }
     #env-buttons {

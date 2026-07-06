@@ -1,4 +1,5 @@
 import logging
+from pygments.util import ClassNotFound
 from textual.app import ComposeResult
 from textual.containers import Grid, VerticalScroll
 from textual.widgets import Static, TabbedContent, TabPane, RichLog
@@ -63,14 +64,26 @@ class TelemetryDashboard(Static):
         """Update the Code Context tab with syntax-highlighted source code."""
         try:
             viewer = self.query_one("#context-viewer", Static)
-            syntax_block = Syntax(
-                source_code, 
-                lexer=language, 
-                theme="monokai", 
-                line_numbers=True, 
-                word_wrap=True,
-                background_color="default" 
-            )
+            try:
+                syntax_block = Syntax(
+                    source_code, 
+                    lexer=language, 
+                    theme="monokai", 
+                    line_numbers=True, 
+                    word_wrap=True,
+                    background_color="default",
+                    tab_size=2
+                )
+            except ClassNotFound:
+                syntax_block = Syntax(
+                    source_code, 
+                    lexer='text', 
+                    theme="monokai", 
+                    line_numbers=True, 
+                    word_wrap=True,
+                    background_color="default",
+                    tab_size=2
+                )
             header = Text.from_markup(header_text)
             viewer.update(Group(header, syntax_block))
             
