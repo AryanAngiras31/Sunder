@@ -26,7 +26,7 @@ class RoleCard(Static):
 
     def render(self):
         # Uses Rich formatting for the title and dim small text
-        return f"[bold cyan]{self.label}[/bold cyan]\n[dim]{self.model_id}[/dim]"
+        return f"[bold]{self.label}[/bold]\n[dim]{self.model_id}[/dim]"
 
     def on_click(self) -> None:
         self.post_message(self.RoleClicked(self.role_id))
@@ -40,16 +40,21 @@ class ModelPickerModal(ModalScreen[dict]):
     """A 30:70 split modal to pick LangGraph models using LiteLLM."""
     
     CSS = """
+    $border-color: #2B2B2B;
+    $focus-border-color: #82BDBD;
+    $text-primary: #e0e0e0;
+    $surface-color: #0D0D0D;
+
     ModelPickerModal {
         align: center middle;
-        background: rgba(0, 0, 0, 0.85);
+        background: $surface-color;
     }
     
     #picker-container {
         width: 85%;
         height: 85%;
-        background: #1e1e1e;
-        border: round #00ffff;
+        background: $surface-color;
+        border: round $border-color;
         padding: 0 0;
         layout: grid;
         grid-size: 3 3; 
@@ -58,17 +63,14 @@ class ModelPickerModal(ModalScreen[dict]):
     }
     
     RoleCard {
-        border: round #5a5a5a;
-        background: #2a2a2a;
+        border: round $border-color;
+        background: $surface-color;
         content-align: center middle;
         height: 100%;
         margin: 0 0;
     }
-    RoleCard:hover {
-        background: #333333;
-    }
     RoleCard.active {
-        border: round #00ff00; 
+        border: round $focus-border-color; 
     }
     
     #bottom-section {
@@ -81,18 +83,18 @@ class ModelPickerModal(ModalScreen[dict]):
     
     #model-search {
         height: 3;
-        border: round #5a5a5a;
-        background: #2a2a2a;
+        border: round $border-color;
+        background: $surface-color;
         margin-bottom: 0;
     }
-    #model-search:focus { border: round #00ff00; }
+    #model-search:focus { border: round $focus-border-color; }
     
     #model-list {
         height: 1fr;
-        border: round #5a5a5a;
+        border: round $border-color;
         background: transparent;
     }
-    #model-list:focus { border: round #00ff00; }
+    #model-list:focus { border: round $focus-border-color; }
     
     #picker-actions {
         column-span: 3;

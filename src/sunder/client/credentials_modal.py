@@ -9,19 +9,24 @@ class CredentialsModal(ModalScreen[bool]):
     """A modal to manage Host LLM API Keys."""
 
     CSS = """
+    $border-color: #2B2B2B;
+    $focus-border-color: #82BDBD;
+    $text-primary: #e0e0e0;
+    $surface-color: #0D0D0D;
+
     CredentialsModal {
         align: center middle;
-        background: rgba(0, 0, 0, 0.85);
+        background: $surface-color;
     }
     #cred-container {
         width: 50%;
         height: auto;
-        background: #1e1e1e;
-        border: round #00ffff;
+        background: $surface-color;
+        border: round $border-color;
         padding: 0 0;
     }
     .cred-row { height: 3; margin-bottom: 0; }
-    .cred-row Label { width: 20%; content-align: left middle; height: 100%; color: #00ffff; }
+    .cred-row Label { width: 20%; content-align: left middle; height: 100%; color: $text-primary; }
     .cred-row Input { width: 80%; }
     #cred-actions { height: 3; align: right middle; margin-top: 0;}
     #cred-actions Button { margin-left: 0; }
@@ -45,7 +50,7 @@ class CredentialsModal(ModalScreen[bool]):
         
             for name, env_key in providers:
                 with Horizontal(classes="cred-row"):
-                    yield Label(name)
+                    yield Label(f"[bold]{name}[/bold]")
                     # Pre-fill with existing key if it exists, but mask it
                     existing = os.environ.get(env_key, "")
                     yield Input(value=existing, password=True, id=env_key, placeholder=f"Enter {name} key...")

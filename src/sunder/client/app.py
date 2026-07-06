@@ -34,9 +34,9 @@ class SunderApp(App):
     $border-color: #2B2B2B;
     $focus-border-color: #82BDBD;
     $text-primary: #e0e0e0;
-    $accent-color: #00ffff;
+    $surface-color: #0D0D0D;
 
-    Screen { background: #0b0b0b; }
+    Screen { background: $surface-color; }
 
     #main-container {
         layout: grid;
@@ -207,14 +207,14 @@ class SunderApp(App):
             dashboard = self.query_one(TelemetryDashboard)
             
             # Pass the raw components to the dashboard so it can render the Syntax block
-            header = f"[bold cyan]Selected Target:[/bold cyan] {target_node.symbol_name} ({target_node.file_path})\n"
+            header = f"[bold]Selected Target:[/bold] {target_node.symbol_name} ({target_node.file_path})\n"
             
             dashboard.update_context(
                 source_code=target_node.source_code, 
                 language=target_node.language, 
                 header_text=header
             )
-            self.notify(f"Target selected: {target_node.symbol_name}", title="Target Selected")
+            self.notify(f"{target_node.symbol_name}", title="Target Selected")
 
     def action_pick_models(self) -> None:
         """Triggered via the [p] hotkey to open the Model Palette."""
