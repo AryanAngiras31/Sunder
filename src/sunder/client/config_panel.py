@@ -11,14 +11,19 @@ class EnvVarModal(ModalScreen[dict]):
     """A pop-up modal to input custom Environment Variables safely."""
     
     CSS = """
+    $border-color: #2B2B2B;
+    $focus-border-color: #82BDBD;
+    $text-primary: #e0e0e0;
+    $surface-color: #0D0D0D;
+    
     EnvVarModal {
         align: center middle;
-        background: rgba(0, 0, 0, 0.8);
+        background: $surface-color;
     }
     #env-modal-container {
         width: 60%;
         height: 60%;
-        background: #1e1e1e;
+        background: $surface-color;
         border: round $border-color;
         padding: 1 2;
     }

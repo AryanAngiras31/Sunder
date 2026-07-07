@@ -6,6 +6,7 @@ from textual.widgets import Header, Footer
 from dotenv import load_dotenv
 from rich.syntax import Syntax
 from rich.text import Text
+from pygments.util import ClassNotFound
 
 # Sunder Core Imports
 from sunder.execution.bootstrapper import Bootstrapper
@@ -193,6 +194,27 @@ class SunderApp(App):
         if os.path.exists(env_path):
             load_dotenv(env_path)
 
+    def _clear_run_logs(self) -> None:
+        """Clears the logs/agent.md and logs/sandbox.md files at the start of a run."""
+        log_dir = os.path.join(os.getcwd(), ".sunder", "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        for filename in ["agent.md", "sandbox.md"]:
+            file_path = os.path.join(log_dir, filename)
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(f"# {filename.split('.')[0].capitalize()} Log\n\n")
+
+    def _log_to_file(self, filename: str, content: str, block_type: str = "") -> None:
+        """Appends plain text to the local markdown log file."""
+        log_dir = os.path.join(os.getcwd(), ".sunder", "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        file_path = os.path.join(log_dir, filename)
+        
+        with open(file_path, "a", encoding="utf-8") as f:
+            if block_type:
+                f.write(f"\n```{block_type}\n{content}\n```\n")
+            else:
+                f.write(f"{content}\n")
+
     def on_mount(self) -> None:
         """Fires immediately when the UI is drawn to the terminal."""
         self.notify("Starting Bootstrapper & Ingestion Engine...", title="Sunder Startup")
@@ -279,21 +301,35 @@ class SunderApp(App):
         profile = config_panel.get_sandbox_profile(custom_image=self.image_tag)
         target_node = self.selected_target_node
         
-        # 3. Setup Dashboard
+        # 3. Setup Dashboard & Clear Logs
         dashboard = self.query_one(TelemetryDashboard)
         dashboard.clear_agent()
+        dashboard.clear_sandbox()
+        self._clear_run_logs()
         
         tabs = self.query_one("TabbedContent")
         tabs.active = "tab-telemetry"
 
-        dashboard.write_agent(f"[bold green]Initiating LangGraph Orchestrator...[/bold green]")
+        dashboard.write_agent("[bold green]Initiating LangGraph Orchestrator...[/bold green]")
+        self._log_to_file("agent.md", "Initiating LangGraph Orchestrator...")
+
         dashboard.write_agent(f"Mode: [cyan]{mode.value}[/cyan]")
+        self._log_to_file("agent.md", f"Mode: {mode.value}")
+
         dashboard.write_agent(f"Target: [cyan]{target_node.symbol_name}[/cyan] ({target_node.file_path})")
+        self._log_to_file("agent.md", f"Target: {target_node.symbol_name} ({target_node.file_path})")
         
         dashboard.write_agent(f"Baseline Coder: [yellow]{self.llm_selections['baseline']}[/yellow]")
+        self._log_to_file("agent.md", f"Baseline Coder: {self.llm_selections['baseline']}")
+
         dashboard.write_agent(f"Adversary Coder: [yellow]{self.llm_selections['adversarial']}[/yellow]")
+        self._log_to_file("agent.md", f"Adversary Coder: {self.llm_selections['adversarial']}")
+
         dashboard.write_agent(f"Evaluator Node: [yellow]{self.llm_selections['evaluator']}[/yellow]")
+        self._log_to_file("agent.md", f"Evaluator Node: {self.llm_selections['evaluator']}")
+
         dashboard.write_agent("---")
+        self._log_to_file("agent.md", "---")
         
         self.notify(f"Starting {mode.value} execution loop...", title="Run Started")
         
@@ -371,6 +407,7 @@ class SunderApp(App):
             
         except Exception as e:
             dashboard.write_agent(f"[bold red]Failed to initialize Orchestrator: {e}[/bold red]")
+            self._log_to_file("agent.md", f"Failed to initialize Orchestrator: {e}")
             self.notify(f"Failed to start Orchestrator.", title="Error", severity="error")
 
     @work
@@ -382,14 +419,17 @@ class SunderApp(App):
                 for node_name, state_update in output.items():
                     # --- 1. AGENT LOG: Node Transition ---
                     dashboard.write_agent(f"\n[bold magenta]▶[/bold magenta] [bold]Node:[/bold] [cyan]{node_name}[/cyan]")
+                    self._log_to_file("agent.md", f"\n▶ Node: {node_name}")
                     
                     # --- 2. CODER NODES: Script Generation ---
                     if "current_test_script" in state_update:
                         script = state_update["current_test_script"]
                         dashboard.write_agent(f"  └─ Generated payload (length: {len(script)} chars)")
+                        self._log_to_file("agent.md", f"  └─ Generated payload (length: {len(script)} chars)")
                         
                         # Sandbox Log: Syntax highlighted injection
                         dashboard.write_sandbox(f"\n[bold blue]--- INJECTED PAYLOAD ({node_name}) ---[/bold blue]")
+                        self._log_to_file("sandbox.md", f"\n--- INJECTED PAYLOAD ({node_name}) ---")
                         # Pass syntax block directly to avoid rich markup injection errors
                         try: 
                             enhanced_script = Syntax(
@@ -410,6 +450,7 @@ class SunderApp(App):
                                 line_numbers=True
                             )
                         dashboard.write_sandbox(enhanced_script)
+                        self._log_to_file("sandbox.md", script, block_type=self.selected_target_node.language)
                         
                     # --- 3. EXECUTOR NODE: Execution Report ---
                     if "execution_report" in state_update:
@@ -417,37 +458,47 @@ class SunderApp(App):
                         color = "green" if report.exit_code == 0 else "red"
                         
                         dashboard.write_agent(f"  └─ Execution finished. Exit Code: [bold {color}]{report.exit_code}[/bold {color}]")
+                        self._log_to_file("agent.md", f"  └─ Execution finished. Exit Code: {report.exit_code}")
                         
                         # Sandbox Log: Environment Outputs
                         dashboard.write_sandbox(f"\n[bold {color}]--- EXECUTION REPORT ---[/bold {color}]")
                         dashboard.write_sandbox(f"Exit Code: {report.exit_code}")
+                        self._log_to_file("sandbox.md", f"\n--- EXECUTION REPORT ---\nExit Code: {report.exit_code}")
                         
                         if report.stdout:
                             dashboard.write_sandbox("\n[bold]STDOUT:[/bold]")
                             # Wrap in rich.text.Text so random brackets in stdout don't crash markup
                             dashboard.write_sandbox(Text(report.stdout))
+                            self._log_to_file("sandbox.md", "STDOUT:")
+                            self._log_to_file("sandbox.md", report.stdout, block_type="text")
                             
                         if report.stderr:
                             dashboard.write_sandbox("\n[bold red]STDERR:[/bold red]")
                             dashboard.write_sandbox(Text(report.stderr, style="red"))
+                            self._log_to_file("sandbox.md", "STDERR:")
+                            self._log_to_file("sandbox.md", report.stderr, block_type="text")
                             
                     # --- 4. EVALUATOR NODE: Feedback & Verdict ---
                     if "evaluator_feedback" in state_update:
                         dashboard.write_agent(f"  ├─ [bold]Evaluator Feedback:[/bold]")
                         dashboard.write_agent(f"  │  [italic]{state_update['evaluator_feedback']}[/italic]")
+                        self._log_to_file("agent.md", f"  ├─ Evaluator Feedback:\n  │  {state_update['evaluator_feedback']}")
                         
                     if "final_verdict" in state_update:
                         verdict = state_update["final_verdict"]
                         # Give secure results green text, vulnerabilities red/yellow
                         v_color = "bold green" if "SECURE" in verdict.name else "bold red"
                         dashboard.write_agent(f"  └─ [bold]Verdict:[/bold] [{v_color}]{verdict.value}[/{v_color}]")
+                        self._log_to_file("agent.md", f"  └─ Verdict: {verdict.value}")
                         
             dashboard.write_agent(f"\n[bold green]Run Completed.[/bold green]")
+            self._log_to_file("agent.md", "\nRun Completed.")
             dashboard.write_sandbox(f"\n[bold green]Container Terminated.[/bold green]")
-            self.notify("Orchestration loop finished.", title="Run Complete", severity="information")
-            
+            self._log_to_file("sandbox.md", "\nContainer Terminated.")
+                        
         except Exception as e:
             dashboard.write_agent(f"\n[bold red]Orchestrator Execution Error: {e}[/bold red]")
+            self._log_to_file("agent.md", f"\nOrchestrator Execution Error: {e}")
             self.notify("Execution failed. See telemetry for details.", title="Fatal Error", severity="error")
 
     def compose(self) -> ComposeResult:
