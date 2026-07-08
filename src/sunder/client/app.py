@@ -180,6 +180,32 @@ class SunderApp(App):
         background: transparent;
         border: round $border-color;
     }
+
+    /* --- FLOATING COPY BUTTONS --- */
+    .pane-wrapper {
+        height: 100%;
+        width: 100%;
+        layers: base overlay; 
+    }
+    
+    Button.copy-btn {
+        layer: overlay;       
+        dock: right;         
+        margin-top: 1;        
+        margin-right: 4;             
+        min-width: 1;        
+        height: 1;   
+        padding: 0;
+        border: none;
+        content-align: center middle;
+        background: $surface-color;
+    }
+    
+    Button.copy-btn:hover {
+        background: $focus-border-color;
+        color: $surface-color;
+        text-style: bold;
+    }
     """
 
     BINDINGS = [
@@ -279,7 +305,6 @@ class SunderApp(App):
                 language=target_node.language, 
                 header_text=header
             )
-            self.notify(f"{target_node.symbol_name}", title="Target Selected")
 
     def action_toggle_sidebar(self) -> None:
         """Triggered via the [b] hotkey to toggle the left sidebar's visibility."""
