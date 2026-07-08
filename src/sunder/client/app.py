@@ -2,7 +2,7 @@ import os
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.widgets import Header, Footer
+from textual.widgets import Header, Footer, Tabs
 from dotenv import load_dotenv
 from rich.syntax import Syntax
 from rich.text import Text
@@ -46,12 +46,23 @@ class SunderApp(App):
         height: 100%; width: 100%;
         padding: 0 1; 
     }
+    
+    /* COLLAPSIBLE SIDEBAR CLASSES */
+    #main-container.sidebar-hidden {
+        grid-size: 1 1;
+        grid-columns: 1fr;
+    }
+    #main-container.sidebar-hidden #sidebar-column {
+        display: none;
+    }
+
     #sidebar-column {
         layout: grid;
         grid-size: 1 2; 
         grid-rows: 18 1fr; 
         height: 100%;
     }
+
     .pane {
         border: round $border-color; 
         background: transparent;
@@ -173,7 +184,7 @@ class SunderApp(App):
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("tab", "app.focus_next", "Change Pane"),
+        ("b", "toggle_sidebar", "Toggle Sidebar"),
         ("s", "start_run", "Start Run"),
         ("p", "pick_models", "Pick Models") 
     ]
@@ -269,6 +280,16 @@ class SunderApp(App):
                 header_text=header
             )
             self.notify(f"{target_node.symbol_name}", title="Target Selected")
+
+    def action_toggle_sidebar(self) -> None:
+        """Triggered via the [b] hotkey to toggle the left sidebar's visibility."""
+        container = self.query_one("#main-container")
+        container.toggle_class("sidebar-hidden")
+        
+        if container.has_class("sidebar-hidden"):
+            self.query_one(Tabs).focus()
+        else:
+            self.query_one("#search-input").focus()
 
     def action_pick_models(self) -> None:
         """Triggered via the [p] hotkey to open the Model Palette."""
