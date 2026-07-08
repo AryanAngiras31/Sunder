@@ -43,7 +43,7 @@ class TelemetryDashboard(Static):
             with TabPane("Execution Report", id="tab-report"):
                 with Container(classes="pane-wrapper"):
                     yield Button("⎘", id="copy-context", classes="copy-btn")
-                    yield Static("Verdict, JWTs, Mock IDs, and Stats.", id="report-viewer")
+                    yield Static("Run an agent loop to see a report", id="report-viewer")
 
     # ---- Dashboard Handlers ----
 

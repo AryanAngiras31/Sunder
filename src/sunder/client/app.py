@@ -117,7 +117,7 @@ class SunderApp(App):
 
     /* --- TABBED CONTENT CLEANUP --- */
     TabbedContent { height: 100%; margin: 0; padding: 0; }
-    TabbedContent > ContentTabs { height: 3; margin: 0; padding: 0; background: transparent; }
+    TabbedContent > ContentTabs { height: 1; margin: 0; padding: 0; background: transparent; }
     TabbedContent > ContentSwitcher { height: 1fr; padding: 0; margin: 0; }
     TabPane { height: 100%; padding: 0; margin: 0; }
     
@@ -298,7 +298,7 @@ class SunderApp(App):
             dashboard = self.query_one(TelemetryDashboard)
             
             # Pass the raw components to the dashboard so it can render the Syntax block
-            header = f"[bold]Selected Target:[/bold] {target_node.symbol_name} ({target_node.file_path})\n"
+            header = f""
             
             dashboard.update_context(
                 source_code=target_node.source_code, 
