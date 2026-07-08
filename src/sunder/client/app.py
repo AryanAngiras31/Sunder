@@ -428,7 +428,7 @@ class SunderApp(App):
                 baseline_coder_llm=baseline_llm,
                 adversary_coder_llm=adversary_llm,
                 evaluator_llm=evaluator_llm,
-                target_path=target_node.file_path,
+                target_path=os.getcwd(),
                 image_tag=self.image_tag
             )
             
