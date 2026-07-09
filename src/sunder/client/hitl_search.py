@@ -32,7 +32,7 @@ class TargetExplorerPane(Vertical):
 
         try:
             # Query the KnowledgeDatabase with limit=5 as requested
-            results = self.app.knowledge_db.fuzzy_search_symbols(search_query, limit=5)
+            results = self.app.knowledge_db.fuzzy_search_symbols(search_query, limit=8)
             
             for node_id, symbol_name, node_type, file_path in results:
                 # Format the text using Textual's Rich markup for clean visuals

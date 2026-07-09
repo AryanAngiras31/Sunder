@@ -26,7 +26,7 @@ class TelemetryDashboard(Static):
                 with Container(classes="pane-wrapper"):
                     yield Button("⎘", id="copy-context", classes="copy-btn")
                     with VerticalScroll(id="context-scroll-container"):
-                        yield Static("Search for a target to view its source code here.", id="context-viewer")
+                        yield Static("\nSearch for a target to view its source code here.", id="context-viewer")
 
             # Tab 2: Live Telemetry (Split Pane)
             with TabPane("Live Telemetry", id="tab-telemetry"):
@@ -43,7 +43,7 @@ class TelemetryDashboard(Static):
             with TabPane("Execution Report", id="tab-report"):
                 with Container(classes="pane-wrapper"):
                     yield Button("⎘", id="copy-context", classes="copy-btn")
-                    yield Static("Run an agent loop to see a report", id="report-viewer")
+                    yield Static("\nRun an agent loop to see a report", id="report-viewer")
 
     # ---- Dashboard Handlers ----
 

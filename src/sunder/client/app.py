@@ -2,7 +2,7 @@ import os
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.widgets import Header, Footer, Tabs
+from textual.widgets import Header, Footer, Tabs, Input
 from dotenv import load_dotenv
 from rich.syntax import Syntax
 from rich.text import Text
@@ -75,7 +75,6 @@ class SunderApp(App):
         color: $text-primary; text-style: bold;
         margin-bottom: 1; content-align: center middle; width: 100%;
     }
-    #target-explorer Input { margin-bottom: 1; }
     
     /* --- COMPACT CONFIG PANEL --- */
     .config-label { 
@@ -206,6 +205,33 @@ class SunderApp(App):
         color: $surface-color;
         text-style: bold;
     }
+
+    /* --- TARGET EXPLORER STYLING --- */
+    #search-input {
+        background: $surface-color;
+        border: round $border-color;
+    }
+    
+    #search-input:focus {
+        background: transparent;
+    }
+    
+    #target-results {
+        background: $surface-color;
+        border: none;
+    }
+
+    #target-results:focus {
+        background: transparent;
+    }
+
+    #target-explorer Input { margin-bottom: 0; }
+
+    #target-results > .option-list--option-highlighted {
+        background: $focus-border-color;
+        color: $surface-color;
+        text-style: bold;
+    }
     """
 
     BINDINGS = [
@@ -305,6 +331,15 @@ class SunderApp(App):
                 language=target_node.language, 
                 header_text=header
             )
+
+    async def on_input_submitted(self, message: Input.Submitted) -> None:
+        """Triggered when the user presses Enter in the search bar."""
+        option_list = self.query_one("#target-results")
+        
+        # Only switch focus if there are actual results to interact with
+        if option_list.option_count > 0:
+            option_list.focus()
+            option_list.highlighted = 0
 
     def action_toggle_sidebar(self) -> None:
         """Triggered via the [b] hotkey to toggle the left sidebar's visibility."""
