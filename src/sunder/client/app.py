@@ -281,6 +281,10 @@ class SunderApp(App):
     def on_mount(self) -> None:
         """Fires immediately when the UI is drawn to the terminal."""
         self.notify("Starting Bootstrapper & Ingestion Engine...", title="Sunder Startup")
+
+        # Clear logs from previous run
+        self._clear_run_logs()
+        
         self.initialize_sunder()
 
     @work(thread=True)
@@ -386,7 +390,6 @@ class SunderApp(App):
         dashboard = self.query_one(TelemetryDashboard)
         dashboard.clear_agent()
         dashboard.clear_sandbox()
-        self._clear_run_logs()
         
         tabs = self.query_one("TabbedContent")
         tabs.active = "tab-telemetry"
@@ -516,7 +519,7 @@ class SunderApp(App):
                             enhanced_script = Syntax(
                                 script, 
                                 lexer=self.selected_target_node.language, 
-                                theme="monokai", 
+                                theme="nord-darker", 
                                 word_wrap=True, 
                                 tab_size=2, 
                                 line_numbers=True
@@ -525,7 +528,7 @@ class SunderApp(App):
                             enhanced_script = Syntax(
                                 script, 
                                 lexer='text', 
-                                theme="monokai", 
+                                theme="nord-darker", 
                                 word_wrap=True, 
                                 tab_size=2, 
                                 line_numbers=True

@@ -32,17 +32,17 @@ class TelemetryDashboard(Static):
             with TabPane("Live Telemetry", id="tab-telemetry"):
                 with Grid(id="telemetry-grid"):
                     with Container(classes="pane-wrapper"):
-                        yield Button("⎘", id="copy-context", classes="copy-btn")
+                        yield Button("⎘", id="copy-agent", classes="copy-btn")
                         yield RichLog(id="agent-workspace", highlight=True, markup=True)
                         
                     with Container(classes="pane-wrapper"):
-                        yield Button("⎘", id="copy-context", classes="copy-btn")
+                        yield Button("⎘", id="copy-sandbox", classes="copy-btn")
                         yield RichLog(id="docker-sandbox", highlight=True, markup=True)
             
             # Tab 3: Execution Report
             with TabPane("Execution Report", id="tab-report"):
                 with Container(classes="pane-wrapper"):
-                    yield Button("⎘", id="copy-context", classes="copy-btn")
+                    yield Button("⎘", id="copy-report", classes="copy-btn")
                     yield Static("\nRun an agent loop to see a report", id="report-viewer")
 
     # ---- Dashboard Handlers ----
@@ -89,7 +89,7 @@ class TelemetryDashboard(Static):
                 syntax_block = Syntax(
                     source_code, 
                     lexer=language, 
-                    theme="monokai", 
+                    theme="nord-darker", 
                     line_numbers=True, 
                     word_wrap=True,
                     background_color="default",
@@ -99,7 +99,7 @@ class TelemetryDashboard(Static):
                 syntax_block = Syntax(
                     source_code, 
                     lexer='text', 
-                    theme="monokai", 
+                    theme="nord-darker", 
                     line_numbers=True, 
                     word_wrap=True,
                     background_color="default",
