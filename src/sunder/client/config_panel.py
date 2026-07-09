@@ -21,15 +21,15 @@ class EnvVarModal(ModalScreen[dict]):
         background: $surface-color;
     }
     #env-modal-container {
-        width: 60%;
-        height: 60%;
+        width: 50%;
+        height: 50%;
         background: $surface-color;
         border: round $border-color;
-        padding: 1 2;
+        padding: 0 1;
     }
     #env-buttons {
         height: auto;
-        margin-top: 1;
+        margin-top: 0;
         align: right middle;
     }
     #env-buttons Button { margin-left: 1; }

@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [project.scripts]
-sunder = "sunder.cli:app"
+sunder = "sunder.client.app:main"
 
 [project.optional-dependencies]
 dev = [

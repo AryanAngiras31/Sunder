@@ -51,15 +51,15 @@ class ModelPickerModal(ModalScreen[dict]):
     }
     
     #picker-container {
-        width: 85%;
-        height: 85%;
+        width: 60%;
+        height: 70%;
         background: $surface-color;
         border: round $border-color;
         padding: 0 0;
         layout: grid;
         grid-size: 3 3; 
         grid-columns: 1fr 1fr 1fr;
-        grid-rows: 30% 1fr 3;
+        grid-rows: 25% 1fr 3;
     }
     
     RoleCard {

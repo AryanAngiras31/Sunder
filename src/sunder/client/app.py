@@ -560,6 +560,10 @@ class SunderApp(App):
 
         yield Footer()
 
-if __name__ == "__main__":
+def main():
+    """CLI Entry Point."""
     app = SunderApp()
     app.run()
+
+if __name__ == "__main__":
+    main()
