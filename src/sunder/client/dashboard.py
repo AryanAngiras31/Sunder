@@ -1,4 +1,5 @@
 import logging
+import os
 from pygments.util import ClassNotFound
 from textual.app import ComposeResult
 from textual.containers import Grid, VerticalScroll, Container

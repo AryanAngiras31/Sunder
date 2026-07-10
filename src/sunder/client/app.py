@@ -121,7 +121,7 @@ class SunderApp(App):
     TabPane { height: 100%; padding: 0; margin: 0; }
     
     #context-viewer { 
-        height: 100%; 
+        height: auto; 
         width: 100%; 
         padding: 0; 
         margin: 0;
@@ -395,22 +395,22 @@ class SunderApp(App):
         tabs = self.query_one("TabbedContent")
         tabs.active = "tab-telemetry"
 
-        dashboard.write_agent("[bold green]Initiating LangGraph Orchestrator...[/bold green]")
+        dashboard.write_agent("[bold cyan]Initiating LangGraph Orchestrator...[/bold cyan]")
         self._log_to_file("agent.md", "Initiating LangGraph Orchestrator...")
 
-        dashboard.write_agent(f"Mode: [cyan]{mode.value}[/cyan]")
+        dashboard.write_agent(f"Mode: {mode.value}")
         self._log_to_file("agent.md", f"Mode: {mode.value}")
 
-        dashboard.write_agent(f"Target: [cyan]{target_node.symbol_name}[/cyan] ({target_node.file_path})")
+        dashboard.write_agent(f"Target:{target_node.symbol_name} ({target_node.file_path})")
         self._log_to_file("agent.md", f"Target: {target_node.symbol_name} ({target_node.file_path})")
         
-        dashboard.write_agent(f"Baseline Coder: [yellow]{self.llm_selections['baseline']}[/yellow]")
+        dashboard.write_agent(f"Baseline Coder: {self.llm_selections['baseline']}")
         self._log_to_file("agent.md", f"Baseline Coder: {self.llm_selections['baseline']}")
 
-        dashboard.write_agent(f"Adversary Coder: [yellow]{self.llm_selections['adversarial']}[/yellow]")
+        dashboard.write_agent(f"Adversary Coder: {self.llm_selections['adversarial']}")
         self._log_to_file("agent.md", f"Adversary Coder: {self.llm_selections['adversarial']}")
 
-        dashboard.write_agent(f"Evaluator Node: [yellow]{self.llm_selections['evaluator']}[/yellow]")
+        dashboard.write_agent(f"Evaluator Node: {self.llm_selections['evaluator']}")
         self._log_to_file("agent.md", f"Evaluator Node: {self.llm_selections['evaluator']}")
 
         dashboard.write_agent("---")
@@ -503,8 +503,8 @@ class SunderApp(App):
             async for output in graph.astream(initial_state):
                 for node_name, state_update in output.items():
                     # --- 1. AGENT LOG: Node Transition ---
-                    dashboard.write_agent(f"\n[bold magenta]▶[/bold magenta] [bold]Node:[/bold] [cyan]{node_name}[/cyan]")
-                    self._log_to_file("agent.md", f"\n▶ Node: {node_name}")
+                    dashboard.write_agent(f"\n[bold]▶[/bold] [cyan]{node_name}[/cyan]")
+                    self._log_to_file("agent.md", f"\n▶ {node_name}")
                     
                     # --- 2. CODER NODES: Script Generation ---
                     if "current_test_script" in state_update:
@@ -513,7 +513,7 @@ class SunderApp(App):
                         self._log_to_file("agent.md", f"  └─ Generated payload (length: {len(script)} chars)")
                         
                         # Sandbox Log: Syntax highlighted injection
-                        dashboard.write_sandbox(f"\n[bold blue]--- INJECTED PAYLOAD ({node_name}) ---[/bold blue]")
+                        dashboard.write_sandbox(f"\n[bold]--- INJECTED PAYLOAD ({node_name}) ---[/bold]")
                         self._log_to_file("sandbox.md", f"\n--- INJECTED PAYLOAD ({node_name}) ---")
                         # Pass syntax block directly to avoid rich markup injection errors
                         try: 
