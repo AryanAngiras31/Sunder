@@ -33,6 +33,28 @@ class EnvVarModal(ModalScreen[dict]):
         align: right middle;
     }
     #env-buttons Button { margin-left: 1; }
+
+    #network-row {
+        height: auto;
+        margin-bottom: 1;
+    }
+    
+    #network-col {
+        width: 1fr;
+    }
+
+    #retries-col {
+        width: 1fr;
+        padding-left: 1;
+    }
+    
+    #network-row #network-switch, #network-row #retries-input {
+        margin-bottom: 0; 
+    }
+    
+    #retries-input {
+        width: 100%; 
+    }
     """
 
     def __init__(self, current_env: dict, **kwargs):
@@ -81,8 +103,13 @@ class ConfigPanel(Vertical):
             yield RadioButton("Baseline (Seeding)", value=True, id="mode-baseline")
             yield RadioButton("Adversarial (Fuzzing)", id="mode-adversarial")
         
-        yield Label("Network Access (Bridge)", classes="config-label")
-        yield Switch(value=False, id="network-switch")
+        with Horizontal(id="network-row"):
+            with Vertical(id="network-col"):
+                yield Label("Network Access (Bridge)", classes="config-label")
+                yield Switch(value=False, id="network-switch")
+            with Vertical(id="retries-col"):
+                yield Label("Max Retries:", classes="config-label", id="retries-label")
+                yield Input(value="3", type="integer", id="retries-input")
         
         yield Label("Memory Limit", classes="config-label")
         yield Input(value="512m", id="memory-input")
@@ -138,3 +165,8 @@ class ConfigPanel(Vertical):
             environment_vars=self.env_vars,
             custom_image=custom_image
         )
+
+    def get_max_retries(self) -> int:
+        """Returns the max retries chosen by the user"""
+        max_retries = int(self.query_one('#retries-input', Input).value)
+        return max_retries

@@ -384,6 +384,7 @@ class SunderApp(App):
         config_panel = self.query_one(ConfigPanel)
         mode = config_panel.get_current_mode()
         profile = config_panel.get_sandbox_profile(custom_image=self.image_tag)
+        max_retries = config_panel.get_max_retries()
         target_node = self.selected_target_node
         
         # 3. Setup Dashboard & Clear Logs
@@ -483,7 +484,7 @@ class SunderApp(App):
                 sandbox_config=profile,
                 env_state=EnvironmentState(),
                 retry_count=0,
-                max_retries=3
+                max_retries=max_retries
             )
             
             # 5. Kick off background execution
