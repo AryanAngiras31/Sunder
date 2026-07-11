@@ -232,6 +232,49 @@ class SunderApp(App):
         color: $surface-color;
         text-style: bold;
     }
+
+    Tab:focus, Tab.-active {
+        background: $focus-border-color !important;
+        color: $surface-color !important;
+    }
+    Underline > .underline--bar {
+        color: $focus-border-color !important;
+        background: $focus-border-color !important;
+    }
+
+    Switch.-on > .switch--slider {
+        color: $focus-border-color !important; 
+        background: $surface-color !important;
+    }
+    Switch:focus {
+        border: round $border-color !important;
+        background: $surface-color;
+    }
+
+    RadioButton, 
+    RadioButton:focus, 
+    RadioButton.-on,
+    RadioButton.-off {
+        background: transparent !important;
+    }
+
+    RadioSet:focus, 
+    RadioSet:focus-within {
+        background: transparent !important;
+        border: round $border-color !important;
+    }
+
+    RadioButton.-on > .toggle--button, 
+    RadioSet:focus-within RadioButton.-on > .toggle--button {
+        color: $focus-border-color !important;
+        background: transparent !important; 
+    }
+
+    RadioButton.-off > .toggle--button, 
+    RadioSet:focus-within RadioButton.-off > .toggle--button {
+        color: $border-color !important;
+        background: transparent !important; 
+    }
     """
 
     BINDINGS = [

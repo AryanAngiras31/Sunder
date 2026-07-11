@@ -55,6 +55,15 @@ class EnvVarModal(ModalScreen[dict]):
     #retries-input {
         width: 100%; 
     }
+
+    TextArea {
+        background: $surface-color;
+        border: round $border-color;
+    }
+    
+    TextArea:focus {
+        border: round $border-color;
+    }
     """
 
     def __init__(self, current_env: dict, **kwargs):
