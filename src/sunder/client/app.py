@@ -256,12 +256,31 @@ class SunderApp(App):
     RadioButton.-on,
     RadioButton.-off {
         background: transparent !important;
+        text-style: none !important;
     }
 
     RadioSet:focus, 
     RadioSet:focus-within {
         background: transparent !important;
         border: round $border-color !important;
+        text-style: none !important;
+    }
+
+    RadioButton > .toggle--button,
+    RadioButton:focus > .toggle--button,
+    RadioButton:hover > .toggle--button,
+    RadioButton.-on > .toggle--button {
+        background: transparent !important;
+        color: $border-color;
+        text-style: none !important;
+    }
+
+    RadioButton > .toggle--label,
+    RadioButton:focus > .toggle--label,
+    RadioButton:hover > .toggle--label,
+    RadioButton.-on > .toggle--label {
+        background: transparent !important;
+        text-style: none !important; 
     }
 
     RadioButton.-on > .toggle--button, 
@@ -392,11 +411,6 @@ class SunderApp(App):
         """Triggered via the [b] hotkey to toggle the left sidebar's visibility."""
         container = self.query_one("#main-container")
         container.toggle_class("sidebar-hidden")
-        
-        if container.has_class("sidebar-hidden"):
-            self.query_one(Tabs).focus()
-        else:
-            self.query_one("#search-input").focus()
 
     def action_pick_models(self) -> None:
         """Triggered via the [p] hotkey to open the Model Palette."""
