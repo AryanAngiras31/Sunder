@@ -556,16 +556,31 @@ class SunderApp(App):
     async def run_orchestration_loop(self, graph, initial_state: SunderAgentState) -> None:
         """Runs the compiled LangGraph asynchronously and routes telemetry cleanly."""
         dashboard = self.query_one(TelemetryDashboard)
+
+        report_data = {
+            "target_name": self.selected_target_node.symbol_name,
+            "language": self.selected_target_node.language,
+            "verdict": "UNKNOWN",
+            "script": "",
+            "feedback": "No feedback provided.",
+            "retries_left": initial_state.max_retries
+        }
+
         try:
             async for output in graph.astream(initial_state):
                 for node_name, state_update in output.items():
                     # --- 1. AGENT LOG: Node Transition ---
                     dashboard.write_agent(f"\n[bold]▶[/bold] [cyan]{node_name}[/cyan]")
                     self._log_to_file("agent.md", f"\n▶ {node_name}")
+
+                    # Capture retries dynamically
+                    if "retry_count" in state_update:
+                        report_data["retries_left"] = initial_state.max_retries - state_update["retry_count"]
                     
                     # --- 2. CODER NODES: Script Generation ---
                     if "current_test_script" in state_update:
                         script = state_update["current_test_script"]
+                        report_data["script"] = script
                         dashboard.write_agent(f"  └─ Generated payload (length: {len(script)} chars)")
                         self._log_to_file("agent.md", f"  └─ Generated payload (length: {len(script)} chars)")
                         
@@ -622,24 +637,35 @@ class SunderApp(App):
                             
                     # --- 4. EVALUATOR NODE: Feedback & Verdict ---
                     if "evaluator_feedback" in state_update:
+                        feedback = state_update["evaluator_feedback"]
+                        report_data["feedback"] = feedback
+
                         dashboard.write_agent(f"  ├─ [bold]Evaluator Feedback:[/bold]")
-                        dashboard.write_agent(f"  │  [italic]{state_update['evaluator_feedback']}[/italic]")
-                        self._log_to_file("agent.md", f"  ├─ Evaluator Feedback:\n  │  {state_update['evaluator_feedback']}")
+                        dashboard.write_agent(f"  │  [italic]{feedback}[/italic]")
+                        self._log_to_file("agent.md", f"  ├─ Evaluator Feedback:\n  │  {feedback}")
                         
                     if "final_verdict" in state_update:
                         verdict = state_update["final_verdict"]
+                        report_data["verdict"] = verdict.name
                         # Give secure results green text, vulnerabilities red/yellow
                         v_color = "bold green" if "SECURE" in verdict.name else "bold red"
                         dashboard.write_agent(f"  └─ [bold]Verdict:[/bold] [{v_color}]{verdict.value}[/{v_color}]")
                         self._log_to_file("agent.md", f"  └─ Verdict: {verdict.value}")
                         
+            # Generate Final Report
+            dashboard.update_report(report_data)
+
             dashboard.write_agent(f"\n[bold green]Run Completed.[/bold green]")
             self._log_to_file("agent.md", "\nRun Completed.")
             dashboard.write_sandbox(f"\n[bold green]Container Terminated.[/bold green]")
             self._log_to_file("sandbox.md", "\nContainer Terminated.")
+
+            # Go to the Execution Report tab after finishing run
+            tabs = self.query_one(TabbedContent)
+            tabs.active = "tab-report"
                         
         except Exception as e:
-            dashboard.write_agent(f"\n[bold red]Orchestrator Execution Error: {e}[/bold red]")
+            dashboard.write_agent(f"\n[bold red]Orchestrator Execution Error: {e}[/bold  red]")
             self._log_to_file("agent.md", f"\nOrchestrator Execution Error: {e}")
             self.notify("Execution failed. See telemetry for details.", title="Fatal Error", severity="error")
 

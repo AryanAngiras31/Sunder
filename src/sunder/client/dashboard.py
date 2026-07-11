@@ -7,6 +7,8 @@ from textual.widgets import Static, TabbedContent, TabPane, RichLog, Button
 from rich.syntax import Syntax
 from rich.console import Group
 from rich.text import Text
+from rich.panel import Panel
+from rich.markdown import Markdown
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +36,18 @@ class TelemetryDashboard(Static):
                 with Grid(id="telemetry-grid"):
                     with Container(classes="pane-wrapper"):
                         yield Button("⎘", id="copy-agent", classes="copy-btn")
-                        yield RichLog(id="agent-workspace", highlight=True, markup=True)
+                        yield RichLog(id="agent-workspace", highlight=True, markup=True, wrap=True)
                         
                     with Container(classes="pane-wrapper"):
                         yield Button("⎘", id="copy-sandbox", classes="copy-btn")
-                        yield RichLog(id="docker-sandbox", highlight=True, markup=True)
+                        yield RichLog(id="docker-sandbox", highlight=True, markup=True, wrap=True)
             
             # Tab 3: Execution Report
             with TabPane("Execution Report", id="tab-report"):
                 with Container(classes="pane-wrapper"):
                     yield Button("⎘", id="copy-report", classes="copy-btn")
-                    yield Static("\nRun an agent loop to see a report", id="report-viewer")
+                    with VerticalScroll(id="report-scroll-container"):
+                        yield Static("\nRun an agent loop to generate a report.", id="report-viewer")
 
     # ---- Dashboard Handlers ----
 
@@ -116,6 +119,70 @@ class TelemetryDashboard(Static):
             scroll_container.scroll_to(0, 0)
         except Exception as e:
             logger.error(f"Failed to update context viewer: {e}")
+
+    def update_report(self, report_data: dict) -> None:
+        """Dynamically builds the Simple Security Report."""
+        target = report_data.get("target_name", "Unknown")
+        verdict = report_data.get("verdict", "UNKNOWN")
+        is_secure = "SECURE" in verdict.upper()
+        
+        v_color = "bold green" if is_secure else "bold red"
+        v_icon = "SECURE" if is_secure else "VULNERABILITY FOUND"
+        
+        retries_left = report_data.get("retries_left", 0)
+        feedback = report_data.get("feedback", "No evaluator feedback provided.")
+        script = report_data.get("script", "")
+        language = report_data.get("language", "text")
+
+        # 1. Header Panel
+        header_panel = Panel(
+            f"[{v_color}]TARGET: {target}[/{v_color}]\n"
+            f"[bold]Retries Remaining:[/bold] {retries_left}",
+            title=f"[{v_color}]{v_icon}[/{v_color}]",
+            title_align="left",
+            border_style="green" if is_secure else "red"
+        )
+
+        # 2. Markdown Feedback Panel
+        feedback_panel = Panel(
+            Markdown(feedback),
+            title="[bold]> EVALUATOR FEEDBACK[/bold]",
+            title_align="left"
+        )
+        
+        # 3. Code Syntax Panel
+        try:
+            syntax_block = Syntax(
+                script, 
+                lexer=language, 
+                theme="nord-darker", 
+                line_numbers=True, 
+                word_wrap=True, # Ensures code wraps to screen limits
+                tab_size=2
+            )
+        except ClassNotFound:
+            syntax_block = Syntax(script, lexer="text", theme="nord-darker", word_wrap=True)
+
+        script_panel = Panel(
+            syntax_block,
+            title="[bold]> FINAL TEST SCRIPT[/bold]",
+            title_align="left"
+        )
+
+        # 4. Render to UI
+        viewer = self.query_one("#report-viewer", Static)
+        viewer.update(Group(header_panel, feedback_panel, script_panel))
+        
+        # 5. Save Raw Text for the Copy Button
+        self._raw_report = (
+            f"--- SECURITY AUDIT REPORT ---\n"
+            f"Verdict: {v_icon} ({target})\n"
+            f"Retries Left: {retries_left}\n\n"
+            f"> EVALUATOR FEEDBACK\n"
+            f"{feedback}\n\n"
+            f"> FINAL TEST SCRIPT\n"
+            f"{script}\n"
+        )
 
     # ---- Clipboard Handlers ----
 
