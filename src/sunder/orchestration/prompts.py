@@ -66,8 +66,8 @@ BASELINE_EVALUATOR_PROMPT = ChatPromptTemplate.from_messages([
         "system", 
         "Evaluate the provided Docker execution logs to determine if the baseline test successfully seeded the mock database and authentication state.\n\n"
         "RULES FOR VERDICTS:\n"
-        "- SYNTAX_ERROR: The generated test script itself failed due to bad imports, missing mocks, or invalid python/testing syntax.\n"
-        "- VULNERABILITY_FOUND: The test script appears structurally and syntactically valid, but the target application crashed or threw an unhandled exception (e.g., ValueError, TypeError) during the happy path.\n"
+        "- SYNTAX_ERROR: The generated test script itself failed due to bad imports, missing mocks, invalid syntax, or incorrect test assumptions. If the test crashes because of HOW the test was written, choose this.\n"
+        "- VULNERABILITY_FOUND: You are 100% certain the target application crashed or threw an unhandled exception during the happy path, AND the test script itself is perfectly written.\n"
         "- SYSTEM_SECURE: The test exited cleanly (Exit 0).\n\n"
         "REQUIREMENTS:\n"
         "1. If SYNTAX_ERROR, output precise 'feedback' instructing the coder on exactly how to fix the provided test script.\n"
@@ -93,8 +93,8 @@ ADVERSARY_EVALUATOR_PROMPT = ChatPromptTemplate.from_messages([
         "system", 
         "Evaluate the provided Docker execution logs to determine if the malicious payload successfully uncovered a logic flaw in the target function.\n\n"
         "RULES FOR VERDICTS:\n"
-        "- SYNTAX_ERROR: The test script failed (Exit > 0) due to a genuine Python/Docker syntax error or missing import, NOT because the target application crashed.\n"
-        "- VULNERABILITY_FOUND: The target application crashed (e.g., 500 error) or the explicit adversarial `assert` statement was tripped.\n"
+        "- SYNTAX_ERROR: The test script failed (Exit > 0) due to test-side issues. This includes genuine syntax errors, missing imports, bad mocks, incorrectly configured test databases, or flawed `assert` logic. If there is ANY doubt whether the crash was caused by the test setup rather than the target function, choose SYNTAX_ERROR.\n"
+        "- VULNERABILITY_FOUND: You are 100% certain a vulnerability exists. The target application crashed or leaked data specifically due to the malicious payload, AND you have verified the test script itself is flawless. Do NOT flag assertion errors caused by bad test assumptions as vulnerabilities.\n"
         "- SYSTEM_SECURE: The test exited cleanly (Exit 0). The attack failed and the system handled the payload gracefully.\n\n"
         "REQUIREMENTS:\n"
         "1. If SYNTAX_ERROR, output precise 'feedback' instructing the coder on exactly how to fix the provided test script.\n"
