@@ -434,7 +434,7 @@ class SunderApp(App):
             return
             
         if any(v == "-NA-" for v in self.llm_selections.values()):
-            self.notify("Please press [p] to configure models for all 3 roles before starting.", title="Incomplete Models", severity="error")
+            self.notify("Press p to choose models for all 3 roles before starting.", title="Incomplete Models", severity="error")
             return
 
         # 2. Retrieve State Components
