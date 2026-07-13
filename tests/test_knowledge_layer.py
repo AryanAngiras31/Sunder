@@ -119,7 +119,7 @@ def test_db_fuzzy_search_join(populated_db):
 # --- RETRIEVAL TESTS ---
 
 def test_context_retriever(populated_db):
-    """Tests that Phase 1 Retrieval accurately stubs children/parents."""
+    """Tests that the ingestion engine accurately stubs children/parents."""
     retriever = ContextRetriever(populated_db)
     
     blast_radius = retriever.get_blast_radius("target_1")
@@ -127,30 +127,6 @@ def test_context_retriever(populated_db):
     assert blast_radius.target_node.symbol_name == "process_payment"
     assert len(blast_radius.children) == 1
     assert len(blast_radius.parents) == 1
-
-def test_context_retriever_phase_1(empty_db):
-    """
-    Tests that Phase 1 Retrieval accurately handles nodes without resolved dependencies.
-    Simulates the exact output of the Phase 1 IngestionEngine.
-    """
-    phase_1_target = CodeNode(
-        node_id="target_phase_1",
-        node_type=NodeType.FUNCTION,
-        file_path="src/main.py",
-        symbol_name="process_payment",
-        source_code="def process_payment():\n    verify_user()\n    charge_card()",
-        child_nodes=[],   
-        parent_nodes=[],  
-        language="python"
-    )
-    empty_db.insert_nodes_batch([phase_1_target])
-    
-    retriever = ContextRetriever(empty_db)
-    blast_radius = retriever.get_blast_radius("target_phase_1")
-    
-    assert blast_radius.target_node.symbol_name == "process_payment"
-    assert len(blast_radius.children) == 0, "Phase 1 nodes should have 0 children resolved."
-    assert len(blast_radius.parents) == 0, "Phase 1 nodes should have 0 parents resolved."
 
 # --- CONTEXT MANAGER TESTS ---
 
@@ -298,3 +274,94 @@ def test_ingestion_nested_repository_traversal(tmp_path, empty_db):
     # Prove that SKIP_FOLDERS and hidden directory logic worked
     assert not any("node_modules" in path for path in paths)
     assert not any(".git" in path for path in paths)
+
+def test_ingestion_resolves_blast_radius(tmp_path, empty_db):
+    """
+    Tests that the 2-pass ingestion engine correctly wires parent and child 
+    nodes together when a function calls another function in the same file.
+    """
+    code = """
+def charge_card():
+    pass
+
+def process_payment():
+    charge_card()
+    """
+    (tmp_path / "payment.py").write_text(code)
+
+    engine = IngestionEngine(empty_db)
+    engine.ingest_repository(str(tmp_path))
+
+    # Fetch node IDs by symbol name
+    cursor = empty_db.conn.cursor()
+    cursor.execute("SELECT node_id, symbol_name FROM code_nodes")
+    nodes = {row["symbol_name"]: row["node_id"] for row in cursor.fetchall()}
+
+    assert "charge_card" in nodes
+    assert "process_payment" in nodes
+
+    charge_node = empty_db.get_node(nodes["charge_card"])
+    process_node = empty_db.get_node(nodes["process_payment"])
+
+    # Assert the AST relationship was mapped bidirectionally
+    assert charge_node.node_id in process_node.child_nodes, "process_payment should have charge_card as a child"
+    assert process_node.node_id in charge_node.parent_nodes, "charge_card should have process_payment as a parent"
+
+
+def test_ingestion_cross_file_resolution(tmp_path, empty_db):
+    """
+    Tests that the 2-pass ingestion engine can resolve parent/child 
+    relationships across entirely different files.
+    """
+    (tmp_path / "auth.py").write_text("def verify_user():\n    pass")
+    (tmp_path / "main.py").write_text("def checkout():\n    verify_user()")
+
+    engine = IngestionEngine(empty_db)
+    engine.ingest_repository(str(tmp_path))
+
+    cursor = empty_db.conn.cursor()
+    cursor.execute("SELECT node_id, symbol_name FROM code_nodes")
+    nodes = {row["symbol_name"]: row["node_id"] for row in cursor.fetchall()}
+
+    verify_node = empty_db.get_node(nodes["verify_user"])
+    checkout_node = empty_db.get_node(nodes["checkout"])
+
+    # Assert Cross-File linkage
+    assert verify_node.node_id in checkout_node.child_nodes
+    assert checkout_node.node_id in verify_node.parent_nodes
+
+
+def test_ingestion_nested_scope_resolution(tmp_path, empty_db):
+    """
+    Verifies the AST Containment Check (min_size logic). 
+    If a reference is inside an inner function, it must map to the inner function, 
+    NOT the outer wrapping function.
+    """
+    code = """
+def trigger_alert():
+    pass
+
+def outer_wrapper():
+    def inner_worker():
+        trigger_alert()
+    """
+    (tmp_path / "nested.py").write_text(code)
+
+    engine = IngestionEngine(empty_db)
+    engine.ingest_repository(str(tmp_path))
+
+    cursor = empty_db.conn.cursor()
+    cursor.execute("SELECT node_id, symbol_name FROM code_nodes")
+    nodes = {row["symbol_name"]: row["node_id"] for row in cursor.fetchall()}
+
+    outer_node = empty_db.get_node(nodes["outer_wrapper"])
+    inner_node = empty_db.get_node(nodes["inner_worker"])
+    alert_node = empty_db.get_node(nodes["trigger_alert"])
+
+    # The inner_worker made the call, so it should be the parent
+    assert inner_node.node_id in alert_node.parent_nodes
+    assert alert_node.node_id in inner_node.child_nodes
+
+    # The outer_wrapper did NOT make the call, so it should NOT be linked to trigger_alert
+    assert outer_node.node_id not in alert_node.parent_nodes
+    assert alert_node.node_id not in outer_node.child_nodes
