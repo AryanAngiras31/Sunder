@@ -47,6 +47,10 @@ class SunderOrchestrator:
     async def baseline_coder_node(self, state: SunderAgentState) -> dict:
         target = state.context.target_node
         logger.debug(f"Executing baseline_coder_node for '{target.symbol_name}' (Attempt {state.retry_count + 1}/{state.max_retries})")
+
+        # Format the Blast Radius for the Prompt
+        children_code = "\n\n".join([f"// {c.file_path} -> {c.symbol_name}\n{c.source_code}" for c in state.context.children]) or "None detected."
+        parents_code = "\n\n".join([f"// {p.file_path} -> {p.symbol_name}\n{p.source_code}" for p in state.context.parents]) or "None detected."
         
         structured_llm = self.baseline_coder_llm.with_structured_output(CoderOutput)
         chain = BASELINE_CODER_PROMPT | structured_llm
@@ -56,6 +60,8 @@ class SunderOrchestrator:
             "file_path": target.file_path,
             "language": target.language,
             "source_code": target.source_code,
+            "children_source": children_code,  
+            "parents_source": parents_code,    
             "previous_test": state.current_test_script if state.retry_count > 0 else "None. This is the first attempt.",
             "feedback": state.evaluator_feedback if state.retry_count > 0 else "None. This is the first attempt."
         })
@@ -66,6 +72,10 @@ class SunderOrchestrator:
     async def adversary_coder_node(self, state: SunderAgentState) -> dict:
         target = state.context.target_node
         logger.debug(f"Executing adversary_coder_node for '{target.symbol_name}' (Attempt {state.retry_count + 1}/{state.max_retries})")
+
+        # Format the Blast Radius for the Prompt
+        children_code = "\n\n".join([f"// {c.file_path} -> {c.symbol_name}\n{c.source_code}" for c in state.context.children]) or "None detected."
+        parents_code = "\n\n".join([f"// {p.file_path} -> {p.symbol_name}\n{p.source_code}" for p in state.context.parents]) or "None detected."
 
         # Explicitly unmask secrets for the LLM prompt
         env = state.env_state
@@ -88,6 +98,8 @@ class SunderOrchestrator:
             "file_path": target.file_path,
             "language": target.language,
             "source_code": target.source_code,
+            "children_source": children_code,  
+            "parents_source": parents_code,    
             "env_state": json.dumps(exposed_env_dict, indent=2) if exposed_env_dict else "None available.",
             "previous_test": state.current_test_script if state.retry_count > 0 else "None. This is the first attempt.",
             "feedback": state.evaluator_feedback if state.retry_count > 0 else "None. This is the first attack vector attempt."

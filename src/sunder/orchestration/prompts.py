@@ -12,20 +12,23 @@ BASELINE_CODER_PROMPT = ChatPromptTemplate.from_messages([
         "1. Prime any required mock database state.\n"
         "2. Fetch or mock valid authentication tokens (e.g., JWTs) if required to execute the target.\n"
         "3. Print any dynamically generated mock IDs or credentials to standard output so they can be captured.\n"
-        "4. Do NOT write adversarial payloads. This test MUST pass cleanly (Exit Code 0).\n"
-        "5. FORMATTING: Return the code via the provided structured output schema. Do NOT use markdown code blocks."
+        "4. You are provided with 'DEPENDENCIES (CHILDREN)'. These are the functions called BY the target. You MUST mock these out to isolate the target logic.\n"
+        "5. You are provided with 'USAGE EXAMPLES (PARENTS)'. Write the test suite such that it tests all of the scenarios in which the target function is used and more.\n"
+        "6. Do NOT write adversarial payloads. This test MUST pass cleanly (Exit Code 0).\n"
+        "7. Return the code via the provided structured output schema. Do NOT use markdown code blocks."
     ),
     (
         "user", 
         "TARGET FUNCTION: {symbol_name}\n"
         "FILE PATH: {file_path}\n"
         "LANGUAGE: {language}\n\n"
-        "TARGET SOURCE CODE:\n```\n{source_code}\n```\n\n"
+        "TARGET SOURCE CODE: \n```\n{source_code}\n```\n\n"
+        "DEPENDENCIES (CHILDREN): \n```\n{children_source}\n```\n\n"
+        "USAGE EXAMPLES (PARENTS): \n```\n{parents_source}\n```\n\n"
         "PREVIOUS TEST ATTEMPT (If applicable):\n```\n{previous_test}\n```\n\n"
         "EVALUATOR FEEDBACK (from previous attempt):\n{feedback}"
     )
 ])
-
 
 # ==========================================
 # ADVERSARY CODER PROMPT
@@ -34,24 +37,28 @@ ADVERSARY_CODER_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system", 
         "You are a senior application security engineer specializing in automated vulnerability discovery. "
-        "Your objective is to write a targeted, highly malicious test script targeting the provided function.\n\n"
+        "Your objective is to write a targeted, highly malicious test suite targeting the provided function.\n\n"
         "REQUIREMENTS:\n"
-        "1. AUTHENTICATION RESILIENCE: Use the provided Seeded Credentials to assess authorization boundaries and test for privilege escalation.\n\n"
+        "1. AUTHENTICATION RESILIENCE: Use the provided Seeded Credentials to assess authorization boundaries and test for privilege escalation.\n"
         "2. TARGETED FUZZING: Subject the function inputs to maliciously mutated data, boundary values, null bytes, "
         "excessively large payloads, and invalid encodings. Do NOT write infinite loops or massive data-generation "
         "engines. The test runs in a sandbox with a tight execution timeout.\n\n"
-        "3. DEPENDENCY IMPLICATION: Analyze the function logic to identify implied dependencies (e.g., ORM calls, "
-        "deserialization routines). Exploit known weaknesses typical for those operations.\n\n"
-        "4. ASSERTION STRATEGY: Write explicit `assert` statements to capture silent data corruption, memory leaks, "
-        "improper error handling, or state leakage.\n\n"
-        "5. FORMATTING: Return the code via the provided structured output schema. Do NOT use markdown code blocks."
+        "3. USAGE CONTEXT: You are provided with 'USAGE EXAMPLES (PARENTS)'. Study these to understand the expected schema and structure of valid inputs before you mutate them.\n"
+        "4. DEPENDENCY MOCKING & VULNERABILITY PROOF: You are provided with 'DEPENDENCIES (CHILDREN)'. You MUST completely mock these out to isolate the target."
+        " To prove a vulnerability like ORM/SQL injection or Command Injection, use your mock to intercept the call and"
+        " explicitly assert that the Target passed your malicious payload into the child dependency without proper sanitization.\n"
+        "5. ASSERTION STRATEGY: Write explicit `assert` statements to capture silent data corruption, memory leaks, "
+        "improper error handling, or state leakage.\n"
+        "6. FORMATTING: Return the code via the provided structured output schema. Do NOT use markdown code blocks."
     ),
     (
         "user", 
         "TARGET FUNCTION: {symbol_name}\n"
         "FILE PATH: {file_path}\n"
         "LANGUAGE: {language}\n\n"
-        "TARGET SOURCE CODE:\n```\n{source_code}\n```\n\n"
+        "TARGET SOURCE CODE: \n```\n{source_code}\n```\n\n"
+        "DEPENDENCIES (CHILDREN): \n```\n{children_source}\n```\n\n"
+        "USAGE EXAMPLES (PARENTS): \n```\n{parents_source}\n```\n\n"
         "SEEDED CREDENTIALS / ENVIRONMENT STATE:\n{env_state}\n\n"
         "PREVIOUS TEST ATTEMPT:\n```\n{previous_test}\n```\n\n"
         "EVALUATOR FEEDBACK:\n{feedback}"
