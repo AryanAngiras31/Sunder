@@ -81,42 +81,76 @@ class TelemetryDashboard(Static):
         except Exception:
             pass
 
-    def update_context(self, source_code: str, language: str, header_text: str) -> None:
-        """Update the Code Context tab with syntax-highlighted source code."""
+    def update_context(self, target_node, children_nodes, parent_nodes) -> None:
+        """Update the Code Context tab with syntax-highlighted source code in nested panels."""
         try:
-            # Save the raw code to memory so the Copy button can grab it easily
-            self._raw_context = source_code 
+            language = target_node.language
+            renderables = []
+            raw_text_parts = []
+
+            # Helper to generate syntax blocks safely
+            def create_syntax(code: str):
+                try:
+                    return Syntax(code, lexer=language, theme="nord-darker", line_numbers=True, word_wrap=True, background_color="default", tab_size=2)
+                except ClassNotFound:
+                    return Syntax(code, lexer='text', theme="nord-darker", line_numbers=True, word_wrap=True, background_color="default", tab_size=2)
+
+            # 1. Target Panel (Nested)
+            target_syntax = create_syntax(target_node.source_code)
+            target_inner_panel = Panel(target_syntax, title=f"[bold]{target_node.file_path}[/bold]", title_align="left")
             
-            # Render the syntax block
+            renderables.append(
+                Panel(target_inner_panel, title=f"[bold]> TARGET: {target_node.symbol_name}[/bold]", title_align="left")
+            )
+            raw_text_parts.append(f"// === TARGET: {target_node.symbol_name} ===\n// {target_node.file_path}\n{target_node.source_code}")
+
+            # 2. Children Panels (Nested)
+            if children_nodes:
+                child_panels = []
+                raw_children = []
+                
+                # Create an inner panel for each child
+                for c in children_nodes:
+                    child_syntax = create_syntax(c.source_code)
+                    child_panels.append(Panel(child_syntax, title=f"[bold]{c.file_path}[/bold]", title_align="left"))
+                    raw_children.append(f"// {c.file_path}\n{c.source_code}")
+                
+                # Group them and wrap them in the outer parent panel
+                renderables.append(
+                    Panel(Group(*child_panels), title="[bold]> CHILDREN[/bold]", title_align="left")
+                )
+                raw_text_parts.append(f"// === CHILDREN ===\n" + "\n\n".join(raw_children))
+
+            # 3. Parents Panels (Nested)
+            if parent_nodes:
+                parent_panels = []
+                raw_parents = []
+                
+                # Create an inner panel for each parent
+                for p in parent_nodes:
+                    parent_syntax = create_syntax(p.source_code)
+                    parent_panels.append(Panel(parent_syntax, title=f"[bold]{p.file_path}[/bold]", title_align="left"))
+                    raw_parents.append(f"// {p.file_path}\n{p.source_code}")
+                
+                # Group them and wrap them in the outer parent panel
+                renderables.append(
+                    Panel(Group(*parent_panels), title="[bold]> PARENTS[/bold]", title_align="left")
+                )
+                raw_text_parts.append(f"// === PARENTS ===\n" + "\n\n".join(raw_parents))
+
+            # Save the raw string for the floating copy button
+            self._raw_context = "\n\n".join(raw_text_parts)
+
+            # Render to UI
             viewer = self.query_one("#context-viewer", Static)
-            try:
-                syntax_block = Syntax(
-                    source_code, 
-                    lexer=language, 
-                    theme="nord-darker", 
-                    line_numbers=True, 
-                    word_wrap=True,
-                    background_color="default",
-                    tab_size=2
-                )
-            except ClassNotFound:
-                syntax_block = Syntax(
-                    source_code, 
-                    lexer='text', 
-                    theme="nord-darker", 
-                    line_numbers=True, 
-                    word_wrap=True,
-                    background_color="default",
-                    tab_size=2
-                )
-            header = Text.from_markup(header_text)
-            viewer.update(Group(header, syntax_block))
+            viewer.update(Group(*renderables))
             
             tabs = self.query_one(TabbedContent)
             tabs.active = "tab-context"
             
             scroll_container = self.query_one("#context-scroll-container", VerticalScroll)
             scroll_container.scroll_to(0, 0)
+            
         except Exception as e:
             logger.error(f"Failed to update context viewer: {e}")
 

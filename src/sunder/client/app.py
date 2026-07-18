@@ -399,26 +399,15 @@ class SunderApp(App):
             manager = ContextManager() # Default 20k token limit
             pruned_context = manager.prune_context(raw_context)
 
-            # 3. Format the display string for the Dashboard
-            display_text = f"// === TARGET: {target_node.symbol_name} ===\n\n{target_node.source_code}\n\n"
+            # Store the state for execution runs
+            self.children_nodes = pruned_context.children
+            self.parent_nodes = pruned_context.parents
             
-            if pruned_context.children:
-                self.children_nodes = pruned_context.children
-                display_text += "// === DEPENDENCIES (CHILDREN) ===\n\n"
-                for child in pruned_context.children:
-                    display_text += f"// {child.file_path}:\n{child.source_code}\n\n"
-                    
-            if pruned_context.parents:
-                self.parent_nodes = pruned_context.parents
-                display_text += "// === USAGE EXAMPLES (PARENTS) ===\n\n"
-                for parent in pruned_context.parents:
-                    display_text += f"// {parent.file_path}:\n{parent.source_code}\n\n"
-            
-            # 4. Update the dashboard with the combined syntax block
+            # 3. Pass the separated context objects to the dashboard
             dashboard.update_context(
-                source_code=display_text.strip(), 
-                language=target_node.language, 
-                header_text=""
+                target_node=target_node,
+                children_nodes=pruned_context.children,
+                parent_nodes=pruned_context.parents
             )
 
     async def on_input_submitted(self, message: Input.Submitted) -> None:
