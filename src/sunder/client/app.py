@@ -2,7 +2,7 @@ import os
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.widgets import Header, Footer, Tabs, Input
+from textual.widgets import Header, Footer, Tabs, Input, TabbedContent
 from dotenv import load_dotenv
 from rich.syntax import Syntax
 from rich.text import Text
@@ -12,6 +12,8 @@ from pygments.util import ClassNotFound
 from sunder.execution.bootstrapper import Bootstrapper
 from sunder.knowledge.database import KnowledgeDatabase
 from sunder.knowledge.ingestion import IngestionEngine
+from sunder.knowledge.retrieval import ContextRetriever
+from sunder.knowledge.context_manager import ContextManager
 
 # TUI Components
 from sunder.client.hitl_search import TargetExplorerPane
@@ -308,6 +310,8 @@ class SunderApp(App):
         self.image_tag = None
         self.knowledge_db = None
         self.selected_target_node = None
+        self.children_nodes = None
+        self.parent_nodes = None
         
         self.llm_selections = {
             "baseline": "-NA-",
@@ -381,21 +385,40 @@ class SunderApp(App):
         """Fires when the user hits 'Enter' on an AST search result."""
         selected_id = message.option.id
         
-        # Fetch the full CodeNode from the database
+        # 1. Fetch the raw node to set the target
         target_node = self.knowledge_db.get_node(selected_id)
         
         if target_node:
             self.selected_target_node = target_node
-
             dashboard = self.query_one(TelemetryDashboard)
+
+            # 2. Retrieve and Prune the full Blast Radius
+            retriever = ContextRetriever(self.knowledge_db)
+            raw_context = retriever.get_blast_radius(selected_id)
             
-            # Pass the raw components to the dashboard so it can render the Syntax block
-            header = f""
+            manager = ContextManager() # Default 20k token limit
+            pruned_context = manager.prune_context(raw_context)
+
+            # 3. Format the display string for the Dashboard
+            display_text = f"// === TARGET: {target_node.symbol_name} ===\n\n{target_node.source_code}\n\n"
             
+            if pruned_context.children:
+                self.children_nodes = pruned_context.children
+                display_text += "// === DEPENDENCIES (CHILDREN) ===\n\n"
+                for child in pruned_context.children:
+                    display_text += f"// {child.file_path}:\n{child.source_code}\n\n"
+                    
+            if pruned_context.parents:
+                self.parent_nodes = pruned_context.parents
+                display_text += "// === USAGE EXAMPLES (PARENTS) ===\n\n"
+                for parent in pruned_context.parents:
+                    display_text += f"// {parent.file_path}:\n{parent.source_code}\n\n"
+            
+            # 4. Update the dashboard with the combined syntax block
             dashboard.update_context(
-                source_code=target_node.source_code, 
+                source_code=display_text.strip(), 
                 language=target_node.language, 
-                header_text=header
+                header_text=""
             )
 
     async def on_input_submitted(self, message: Input.Submitted) -> None:
@@ -443,6 +466,8 @@ class SunderApp(App):
         profile = config_panel.get_sandbox_profile(custom_image=self.image_tag)
         max_retries = config_panel.get_max_retries()
         target_node = self.selected_target_node
+        children_nodes = self.children_nodes
+        parent_nodes = self.parent_nodes 
         
         # 3. Setup Dashboard & Clear Logs
         dashboard = self.query_one(TelemetryDashboard)
@@ -535,8 +560,8 @@ class SunderApp(App):
                 mode=mode,
                 context=BlastRadiusContext(
                     target_node=target_node,
-                    children=[],
-                    parents=[]
+                    children=children_nodes,
+                    parents=parent_nodes
                 ),
                 sandbox_config=profile,
                 env_state=EnvironmentState(),
