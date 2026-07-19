@@ -2,7 +2,7 @@ import os
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.widgets import Header, Footer, Tabs, Input, TabbedContent
+from textual.widgets import Header, Footer, Input, TabbedContent
 from dotenv import load_dotenv
 from rich.syntax import Syntax
 from rich.text import Text
@@ -296,6 +296,10 @@ class SunderApp(App):
         color: $border-color !important;
         background: transparent !important; 
     }
+
+    LoadingIndicator {
+        color: $focus-border-color;
+    }
     """
 
     BINDINGS = [
@@ -533,13 +537,20 @@ class SunderApp(App):
             baseline_llm = create_llm(self.llm_selections['baseline'], 0.2)
             adversary_llm = create_llm(self.llm_selections['adversarial'], 0.7)
             evaluator_llm = create_llm(self.llm_selections['evaluator'], 0)
+
+            # Create a UI callback for the loading spinner
+            def handle_node_start(status_msg: str):
+                self.sub_title = f"{status_msg}"
+                self.query_one("#agent-workspace").loading = True
+                self.query_one("#docker-sandbox").loading = True
             
             orchestrator = SunderOrchestrator(
                 baseline_coder_llm=baseline_llm,
                 adversary_coder_llm=adversary_llm,
                 evaluator_llm=evaluator_llm,
                 target_path=os.getcwd(),
-                image_tag=self.image_tag
+                image_tag=self.image_tag,
+                on_node_start=handle_node_start
             )
             
             graph = orchestrator.build_graph()
@@ -582,6 +593,10 @@ class SunderApp(App):
 
         try:
             async for output in graph.astream(initial_state):
+                # Turn off the loading spinner the moment a node finishes and yields output
+                self.query_one("#agent-workspace").loading = False
+                self.query_one("#docker-sandbox").loading = False
+
                 for node_name, state_update in output.items():
                     # --- 1. AGENT LOG: Node Transition ---
                     dashboard.write_agent(f"\n[bold]▶[/bold] [cyan]{node_name}[/cyan]")
@@ -677,11 +692,17 @@ class SunderApp(App):
             # Go to the Execution Report tab after finishing run
             tabs = self.query_one(TabbedContent)
             tabs.active = "tab-report"
+
+            # Reset the subtitle upon completion
+            self.sub_title = "Zero-Trust Agentic Fuzzer"
                         
         except Exception as e:
             dashboard.write_agent(f"\n[bold red]Orchestrator Execution Error: {e}[/bold  red]")
             self._log_to_file("agent.md", f"\nOrchestrator Execution Error: {e}")
             self.notify("Execution failed. See telemetry for details.", title="Fatal Error", severity="error")
+
+            # Reset the subtitle upon completion
+            self.sub_title = "Zero-Trust Agentic Fuzzer"
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)

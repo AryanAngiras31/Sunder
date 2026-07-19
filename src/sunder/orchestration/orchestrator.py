@@ -30,12 +30,13 @@ class SunderOrchestrator:
     Object-Oriented LangGraph Orchestrator.
     Persists BYOK models and static infrastructure variables at the instance level.
     """
-    def __init__(self, baseline_coder_llm, adversary_coder_llm, evaluator_llm, target_path: str, image_tag: str):
+    def __init__(self, baseline_coder_llm, adversary_coder_llm, evaluator_llm, target_path: str, image_tag: str, on_node_start=None):
         self.baseline_coder_llm = baseline_coder_llm
         self.adversary_coder_llm = adversary_coder_llm
         self.evaluator_llm = evaluator_llm
         self.target_path = target_path
         self.image_tag = image_tag
+        self.on_node_start = on_node_start
         self.sandbox_executor = SandboxExecutor()
         
         logger.info(f"Initialized SunderOrchestrator for target '{target_path}' with image '{image_tag}'")
@@ -54,6 +55,9 @@ class SunderOrchestrator:
         
         structured_llm = self.baseline_coder_llm.with_structured_output(CoderOutput)
         chain = BASELINE_CODER_PROMPT | structured_llm
+
+        if self.on_node_start:
+            self.on_node_start("Baseline Coder is writing the happy-path test suite...")
         
         response: CoderOutput = await chain.ainvoke({
             "symbol_name": target.symbol_name,
@@ -92,6 +96,9 @@ class SunderOrchestrator:
 
         structured_llm = self.adversary_coder_llm.with_structured_output(CoderOutput)
         chain = ADVERSARY_CODER_PROMPT | structured_llm
+
+        if self.on_node_start:
+            self.on_node_start("Adversary Coder is generating the malicious test suite...")
         
         response: CoderOutput = await chain.ainvoke({
             "symbol_name": target.symbol_name,
@@ -110,6 +117,9 @@ class SunderOrchestrator:
 
     def executor_node(self, state: SunderAgentState) -> dict:
         logger.debug("Starting Sandbox execution...")
+
+        if self.on_node_start:
+            self.on_node_start("Executor is running the test in the sandbox...")
         
         # Run the latest test script in the sandbox
         report = self.sandbox_executor.run_test(
@@ -139,6 +149,10 @@ class SunderOrchestrator:
             structured_llm = self.evaluator_llm.with_structured_output(AdversaryEvaluatorOutput)
             
         chain = prompt | structured_llm
+
+        if self.on_node_start:
+            self.on_node_start("Evaluator is analyzing the test script and execution logs...")
+
         eval_result = await chain.ainvoke({
             "source_code": state.context.target_node.source_code,
             "current_test_script": state.current_test_script,
