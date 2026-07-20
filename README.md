@@ -1,6 +1,6 @@
 # Sunder
 
-An Agentic zero-trust sandbox testing framework for enterprise codebases. 
+An agentic zero-trust sandbox testing framework for enterprise codebases. 
  
 ## Overview
 Sunder operates in two sequential phases to guarantee deep logic penetration without being blocked by surface-level authentication or state requirements. It utilizes a Baseline Mode for state seeding and an Adversarial Mode for chaos fuzzing and logic assertions.
@@ -11,7 +11,7 @@ Sunder was built to prioritize comprehensive test coverage, absolute host protec
 * **Zero-Trust Copy-on-Run Architecture:** Mounts host codebases strictly as Read-Only (`ro`) and uses an in-memory tar stream to extract files into an ephemeral container workspace. This guarantees host protection while mimicking a physical project tree.
 * **Relational AST Retrieval (Blast-Radius Context):** Abandons traditional vector search in favor of Tree-sitter AST parsing and an in-memory SQLite database. This instantly maps exact call graphs, providing the LLM with the Target function, its Children (for accurate mocking), and its Parents (for input mimicry).
 * **Two-Phase State Seeding:** Overcomes surface-level authentication blockers. A Baseline Phase explicitly generates happy-path tests along with setup code to capture required state (e.g., valid JWTs, mock database IDs) before injecting them into the Adversarial Phase for deep logic fuzzing.
-* **Evaluator-Optimizer Loop:** Prevents context-window bloat and endless hallucination loops. A dedicated Evaluator node intercepts massive, raw Docker stack traces from failed runs and distills them into concise, actionable feedback for the Coder node.**
+* **Evaluator-Optimizer Loop:** Prevents context-window bloat and endless hallucination loops. A dedicated Evaluator node intercepts massive, raw Docker stack traces from failed runs and distills them into concise, actionable feedback for the Coder node.
 * **Sandbox Config:** Enforces default architectural containment (`network_mode="none"`), requiring explicit human opt-in via the TUI to configure resource limits (RAM, CPU, execution timeouts), inject environment variables, or allow external API routing.  
 
 ## High-Level Architecture
@@ -51,9 +51,7 @@ sunder/
 │       │   ├── retrieval.py            # Context fetching
 │       │   └── queries/                # Language-specific AST queries
 │       │       ├── python/
-│       │       ├── javascript/
 │       │       ├── typescript/
-│       │       ├── go/
 │       │       ├── rust/
 │       │       └── ... (20+ language directories)
 │       └── orchestration/              # LangGraph agent logic
@@ -75,7 +73,18 @@ Sunder is distributed as an isolated Python application via pipx.
 ```bash
 pipx install sunder-cli
 ```
- 
+
+## Prerequisites
+
+Before using Sunder, you must have **Docker** installed and the Docker Daemon actively running in the background. Sunder's bootstrapper relies on the local daemon to dynamically build the isolated sandboxes.
+
+## Usage & API Keys (BYOK)
+
+Sunder is strictly a local tool and operates on a Bring Your Own Key (BYOK) architecture. 
+
+1. **Launch the Application:** Open your terminal in the root of your configured enterprise repository and type `sunder` to start the TUI.
+2. **Configure Credentials:** Upon your first launch, press the `[p]` hotkey to open the Model Picker. Here, you can input your LLM API keys into the credentials modal. These keys are saved securely and locally to your machine.
+
 ## Repository Configuration
  
 To use Sunder on your enterprise repository, you must create a configuration directory at the root of your project.
@@ -95,5 +104,5 @@ RUN pip install pytest
 # Do NOT define an ENTRYPOINT or CMD.
 ```
  
-# Licence
-This project is licensed under the [MIT License](./LICENCE.txt).
+## Licence
+This project is licensed under the [MIT Licence](./LICENCE.txt).
