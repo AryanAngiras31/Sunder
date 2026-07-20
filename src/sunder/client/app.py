@@ -1,8 +1,9 @@
 import os
+import asyncio
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.widgets import Header, Footer, Input, TabbedContent
+from textual.widgets import Header, Footer, Tabs, Input, TabbedContent
 from dotenv import load_dotenv
 from rich.syntax import Syntax
 from rich.text import Text
@@ -466,9 +467,6 @@ class SunderApp(App):
         dashboard = self.query_one(TelemetryDashboard)
         dashboard.clear_agent()
         dashboard.clear_sandbox()
-        
-        tabs = self.query_one("TabbedContent")
-        tabs.active = "tab-telemetry"
 
         dashboard.write_agent("[bold cyan]Initiating LangGraph Orchestrator...[/bold cyan]")
         self._log_to_file("agent.md", "Initiating LangGraph Orchestrator...")
@@ -537,20 +535,13 @@ class SunderApp(App):
             baseline_llm = create_llm(self.llm_selections['baseline'], 0.2)
             adversary_llm = create_llm(self.llm_selections['adversarial'], 0.7)
             evaluator_llm = create_llm(self.llm_selections['evaluator'], 0)
-
-            # Create a UI callback for the loading spinner
-            def handle_node_start(status_msg: str):
-                self.sub_title = f"{status_msg}"
-                self.query_one("#agent-workspace").loading = True
-                self.query_one("#docker-sandbox").loading = True
             
             orchestrator = SunderOrchestrator(
                 baseline_coder_llm=baseline_llm,
                 adversary_coder_llm=adversary_llm,
                 evaluator_llm=evaluator_llm,
                 target_path=os.getcwd(),
-                image_tag=self.image_tag,
-                on_node_start=handle_node_start
+                image_tag=self.image_tag
             )
             
             graph = orchestrator.build_graph()
@@ -568,6 +559,13 @@ class SunderApp(App):
                 retry_count=0,
                 max_retries=max_retries
             )
+
+            # Turn ON the loading spinners synchronously on the main thread
+            self.query_one("#agent-workspace").loading = True
+            self.query_one("#docker-sandbox").loading = True
+                    
+            tabs = self.query_one(TabbedContent)
+            tabs.active = "tab-telemetry"
             
             # 5. Kick off background execution
             self.run_orchestration_loop(graph, initial_state)
@@ -576,6 +574,10 @@ class SunderApp(App):
             dashboard.write_agent(f"[bold red]Failed to initialize Orchestrator: {e}[/bold red]")
             self._log_to_file("agent.md", f"Failed to initialize Orchestrator: {e}")
             self.notify(f"Failed to start Orchestrator.", title="Error", severity="error")
+
+            # Force focus back to telemetry
+            tabs = self.query_one(TabbedContent)
+            tabs.active = "tab-telemetry"
 
     @work
     async def run_orchestration_loop(self, graph, initial_state: SunderAgentState) -> None:
@@ -593,7 +595,8 @@ class SunderApp(App):
 
         try:
             async for output in graph.astream(initial_state):
-                # Turn off the loading spinner the moment a node finishes and yields output
+
+                # Turn OFF the loading spinner
                 self.query_one("#agent-workspace").loading = False
                 self.query_one("#docker-sandbox").loading = False
 
@@ -693,16 +696,22 @@ class SunderApp(App):
             tabs = self.query_one(TabbedContent)
             tabs.active = "tab-report"
 
-            # Reset the subtitle upon completion
-            self.sub_title = "Zero-Trust Agentic Fuzzer"
+        except asyncio.CancelledError:
+            # Harmlessly intercepts the worker cancellation when the user presses 'q' to quit
+            pass
                         
         except Exception as e:
+            # Remove the loading spinners if a crash occurs
+            self.query_one("#agent-workspace").loading = False
+            self.query_one("#docker-sandbox").loading = False
+
             dashboard.write_agent(f"\n[bold red]Orchestrator Execution Error: {e}[/bold  red]")
             self._log_to_file("agent.md", f"\nOrchestrator Execution Error: {e}")
             self.notify("Execution failed. See telemetry for details.", title="Fatal Error", severity="error")
-
-            # Reset the subtitle upon completion
-            self.sub_title = "Zero-Trust Agentic Fuzzer"
+            
+            # Force the UI to remain on the telemetry tab to show the error
+            tabs = self.query_one(TabbedContent)
+            tabs.active = "tab-telemetry"
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
