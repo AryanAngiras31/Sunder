@@ -438,7 +438,7 @@ class SunderApp(App):
         # Push the modal onto the screen and pass it the current selections
         self.app.push_screen(ModelPickerModal(self.llm_selections), update_models)
 
-    def action_start_run(self) -> None:
+    async def action_start_run(self) -> None:
         """Triggered via the [s] hotkey. Checks prerequisites and instantly starts the run."""
         
         # 1. Prerequisite Checks
@@ -560,24 +560,30 @@ class SunderApp(App):
                 max_retries=max_retries
             )
 
+            # Switch to the tab first
+            tabs = self.query_one(TabbedContent)
+            tabs.active = "tab-telemetry"
+
+            # Anchor focus to a stable widget inside the telemetry tab to prevent Textual from auto-switching tabs when the logs disappear
+            self.query_one("#copy-agent").focus()
+
             # Turn ON the loading spinners synchronously on the main thread
             self.query_one("#agent-workspace").loading = True
             self.query_one("#docker-sandbox").loading = True
-                    
-            tabs = self.query_one(TabbedContent)
-            tabs.active = "tab-telemetry"
             
             # 5. Kick off background execution
             self.run_orchestration_loop(graph, initial_state)
             
         except Exception as e:
-            dashboard.write_agent(f"[bold red]Failed to initialize Orchestrator: {e}[/bold red]")
-            self._log_to_file("agent.md", f"Failed to initialize Orchestrator: {e}")
-            self.notify(f"Failed to start Orchestrator.", title="Error", severity="error")
-
             # Force focus back to telemetry
             tabs = self.query_one(TabbedContent)
             tabs.active = "tab-telemetry"
+
+            self.query_one("#copy-agent").focus()
+
+            dashboard.write_agent(f"[bold red]Failed to initialize Orchestrator: {e}[/bold red]")
+            self._log_to_file("agent.md", f"Failed to initialize Orchestrator: {e}")
+            self.notify(f"Failed to start Orchestrator.", title="Error", severity="error")
 
     @work
     async def run_orchestration_loop(self, graph, initial_state: SunderAgentState) -> None:
@@ -701,6 +707,12 @@ class SunderApp(App):
             pass
                         
         except Exception as e:
+            # Force the UI to remain on the telemetry tab to show the error
+            tabs = self.query_one(TabbedContent)
+            tabs.active = "tab-telemetry"
+
+            self.query_one("#copy-agent").focus()
+
             # Remove the loading spinners if a crash occurs
             self.query_one("#agent-workspace").loading = False
             self.query_one("#docker-sandbox").loading = False
@@ -708,10 +720,6 @@ class SunderApp(App):
             dashboard.write_agent(f"\n[bold red]Orchestrator Execution Error: {e}[/bold  red]")
             self._log_to_file("agent.md", f"\nOrchestrator Execution Error: {e}")
             self.notify("Execution failed. See telemetry for details.", title="Fatal Error", severity="error")
-            
-            # Force the UI to remain on the telemetry tab to show the error
-            tabs = self.query_one(TabbedContent)
-            tabs.active = "tab-telemetry"
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
