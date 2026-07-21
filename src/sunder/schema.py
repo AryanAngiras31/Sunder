@@ -215,8 +215,8 @@ class CoderOutput(BaseModel):
     test_script: str = Field(
         description=(
             "The complete, fully executable test script code. "
-            "Do NOT include markdown formatting (like ```python). "
-            "Output strictly the raw source code."
+            "You MUST wrap the code in standard markdown code blocks (e.g., ```python ... ```). "
+            "Ensure proper indentation and newlines are preserved."
         )
     )
 
@@ -411,7 +411,7 @@ LANGUAGE_RUN_COMMANDS = {
     "typescript": "npx -y tsx sunder_generated_test.test.ts",
     "go": "go test sunder_generated_test_test.go",
     "java": "java sunder_generated_testTest.java",  # Relies on Java 11+ single-file source execution
-    "rust": "rustc sunder_generated_test.rs && ./sunder_generated_test",
+    "rust": 'CARGO_DIR=$(dirname $(find . -maxdepth 3 -name "Cargo.toml" | head -n 1)) && mkdir -p $CARGO_DIR/tests && mv sunder_generated_test.rs $CARGO_DIR/tests/sunder_generated_test.rs && cd $CARGO_DIR && cargo test --test sunder_generated_test',
     "c": "gcc sunder_generated_test.c -o test_bin && ./test_bin",
     "cpp": "g++ sunder_generated_test.cpp -o test_bin && ./test_bin",
     "c-sharp": "csc sunder_generated_testTests.cs && mono sunder_generated_testTests.exe", 

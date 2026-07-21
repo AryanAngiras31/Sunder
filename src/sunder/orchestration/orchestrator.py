@@ -1,6 +1,6 @@
 import logging
 from langgraph.graph import StateGraph, END
-
+import re
 import json
 from pydantic import SecretStr
 
@@ -66,7 +66,10 @@ class SunderOrchestrator:
             "feedback": state.evaluator_feedback if state.retry_count > 0 else "None. This is the first attempt."
         })
 
-        return {"current_test_script": response.test_script}
+        # Strip the markdown tags (e.g., ```python, ```rust, and the trailing ```)
+        clean_script = re.sub(r"^```[a-zA-Z0-9]*\n|```$", "", response.test_script.strip(), flags=re.MULTILINE)
+
+        return {"current_test_script": clean_script}
 
 
     async def adversary_coder_node(self, state: SunderAgentState) -> dict:
@@ -105,7 +108,10 @@ class SunderOrchestrator:
             "feedback": state.evaluator_feedback if state.retry_count > 0 else "None. This is the first attack vector attempt."
         })
 
-        return {"current_test_script": response.test_script}
+        # Strip the markdown tags (e.g., ```python, ```rust, and the trailing ```)
+        clean_script = re.sub(r"^```[a-zA-Z0-9]*\n|```$", "", response.test_script.strip(), flags=re.MULTILINE)
+
+        return {"current_test_script": clean_script}
 
 
     def executor_node(self, state: SunderAgentState) -> dict:
