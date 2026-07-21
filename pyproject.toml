@@ -3,9 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sunder"
+name = "sunder-cli"
 version = "0.1.0"
 description = "Agentic zero-trust sandbox testing."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Aryan S Angiras", email = "aryan.s.angiras31@gmail.com" }
+]
 dependencies = [
     "pydantic==2.13.4",
     "docker==7.1.0",
@@ -32,6 +37,9 @@ sunder = "sunder.client.app:main"
 dev = [
     "pytest==8.0.0"
 ]
+
+[project.urls]
+Homepage = "https://github.com/AryanAngiras31/Sunder"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sunder"]
