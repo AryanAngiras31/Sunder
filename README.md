@@ -2,6 +2,8 @@
 
 An agentic zero-trust sandbox testing framework for enterprise codebases. 
  
+![Sunder Demo](docs/assets/sunder_demo.gif)
+
 ## Overview
 Sunder operates in two sequential phases to guarantee deep logic penetration without being blocked by surface-level authentication or state requirements. It utilizes a Baseline Mode for state seeding and an Adversarial Mode for chaos fuzzing and logic assertions.
  
